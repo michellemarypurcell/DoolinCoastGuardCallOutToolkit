@@ -68,7 +68,7 @@ const lon = -9.3772;
 
 async function fetchWeather() {
 try {
-const res = await fetch(`https://prodapi.met.ie/weather/api/location/${lat}/${lon}/forecast/`);
+const res = await fetch(`https://corsproxy.io/?https://prodapi.met.ie/weather/api/location/${lat}/${lon}/forecast/`);
 const data = await res.json();
 
 // Take first period (current/nearest forecast)
@@ -102,9 +102,7 @@ document.getElementById("weather-icon").innerText = "⚠️";
 
 async function fetchTide() {
 try {
-const res = await fetch(
-"https://erddap.marine.ie/erddap/tabledap/IrelandTideGauge.json?time%2Cwaterlevel&station=Lahinch&orderBy(%22time%20desc%22)&limit=1"
-);
+const res = await fetch("https://corsproxy.io/?https://erddap.marine.ie/erddap/tabledap/IrelandTideGauge.json?time%2Cwaterlevel&station=Lahinch&orderBy(%22time%20desc%22)&limit=1");
 const data = await res.json();
 const latest = data.table.rows[0]; // [time, waterlevel]
 const time = new Date(latest[0]).toLocaleTimeString();
