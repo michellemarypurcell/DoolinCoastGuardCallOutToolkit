@@ -1,292 +1,191 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="UTF-8">
 <title>Doolin Coast Guard SAR Call Out Toolkit</title>
 <style>
-:root {
---glass-bg: rgba(0,0,0,0.55);
---card-bg: rgba(0,0,0,0.65);
---accent: #4dd0ff;
---text: #fff;
+body {
+font-family: Arial, sans-serif;
+background: url('background.jpg') no-repeat center center fixed;
+background-size: cover;
+color: #fff;
+text-align: center;
+margin: 0;
+padding: 0;
 }
-html, body {
-margin: 0; height: 100%;
-font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-color: var(--text);
-background: #000 url('background.jpg') no-repeat center center fixed;
-background-size: cover; /* centered per your note */
-}
-.overlay {
-position: fixed; inset: 0; background: var(--glass-bg); backdrop-filter: blur(2px);
-}
-.app {
-position: relative; z-index: 1; min-height: 100%;
-display: grid; grid-template-rows: auto 1fr;
-}
-header {
-padding: 18px 24px; background: rgba(0,0,0,0.5);
-display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
-}
+
 h1 {
-font-size: 2.2rem; margin: 0 16px 0 0; line-height: 1.15;
+background: rgba(0, 0, 0, 0.6);
+padding: 20px;
+font-size: 3em;
 }
-select, button {
-font-size: 1.2rem; padding: 10px 12px; border-radius: 10px; border: 0;
+
+.container {
+display: flex;
+flex-direction: column;
+justify-content: center;
+align-items: center;
+gap: 40px;
+margin: 20px auto;
+max-width: 1200px;
 }
-.grid {
-display: grid; gap: 18px; padding: 18px;
-grid-template-columns: repeat(12, 1fr);
+
+.widget {
+background: rgba(0, 0, 0, 0.65);
+padding: 30px;
+border-radius: 15px;
+width: 90%;
+max-width: 800px;
+font-size: 1.8em;
+text-align: left;
 }
-.card {
-background: var(--card-bg);
-border: 1px solid rgba(255,255,255,0.18);
-border-radius: 18px; padding: 18px; min-height: 220px;
-display: flex; flex-direction: column; gap: 12px;
+
+.widget h2 {
+margin-top: 0;
+font-size: 2em;
+text-align: center;
 }
-.card h2 { font-size: 1.6rem; margin: 0 0 4px; color: var(--accent); }
-.big { font-size: 2.2rem; }
-.row { display: flex; gap: 18px; flex-wrap: wrap; align-items: baseline; }
-.muted { opacity: 0.9; font-size: 1rem; }
-.weather { grid-column: span 4; }
-.tide { grid-column: span 4; }
-.news { grid-column: span 4; }
-@media (max-width: 1200px) { .weather,.tide,.news { grid-column: span 12; } }
-.error { color: #ffb4b4; }
-ul.newslist { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-ul.newslist li a { color: #e7f6ff; font-size: 1.25rem; text-decoration: none; }
-ul.newslist li .date { font-size: 0.95rem; opacity: .9; }
-.footer { padding: 8px 18px 18px; font-size: 0.95rem; opacity: 0.9; }
+
+input, button {
+font-size: 1.5em;
+padding: 10px;
+margin: 10px;
+}
 </style>
 </head>
 <body>
-<div class="overlay"></div>
-<div class="app">
-<header>
 <h1>Doolin Coast Guard SAR Call Out Toolkit</h1>
-<label>
-<span class="sr-only">Location</span>
-<select id="locationSelect"></select>
-</label>
-<span class="muted" id="updatedAt"></span>
-</header>
 
-<main class="grid">
-<section class="card weather" id="weatherCard">
-<h2>Realtime Weather (Met Éireann WDB)</h2>
-<div id="weatherBody" class="big">—</div>
-<div class="muted" id="weatherSub">Wind, gust, temp, pressure, cloud</div>
-<div class="error" id="weatherErr"></div>
-</section>
+<div>
+<input type="text" id="location" placeholder="Enter Irish location (e.g. Doolin)">
+<button onclick="updateData()">Update</button>
+</div>
 
-<section class="card tide" id="tideCard">
-<h2>Tidal Level (Marine Institute ERDDAP)</h2>
-<div id="tideBody" class="big">—</div>
-<div class="muted" id="tideSub">Station: —</div>
-<div class="error" id="tideErr"></div>
-</section>
+<div class="container">
+<div class="widget">
+<h2>Weather</h2>
+<div id="weatherData">Loading...</div>
+</div>
 
-<section class="card news" id="newsCard">
-<h2>Local SAR News</h2>
-<ul class="newslist" id="newsList"></ul>
-<div class="error" id="newsErr"></div>
-</section>
-</main>
+<div class="widget">
+<h2>Tides</h2>
+<div id="tideData">Loading...</div>
+</div>
 
-<div class="footer">
-Data: © Met Éireann & Marine Institute (CC-BY 4.0, see their terms). News via Google News RSS. Refreshes every minute.
+<div class="widget">
+<h2>SAR News</h2>
+<div id="newsData">Loading...</div>
 </div>
 </div>
 
 <script>
-/** ====== CONFIG ====== **/
-const WORKER_BASE = 'https://YOURNAME.workers.dev'; // ← REPLACE with your Worker URL
-const REFRESH_MS = 60_000;
+// 👇 replace this with your actual Cloudflare Worker URL once deployed
+const proxy = "https://YOUR-WORKER-NAME.YOURNAME.workers.dev/?url=";
 
-// Met Éireann WDB locationforecast (XML) — note this is *http*, so we always go via proxy
-function wdbUrl(lat, lon) {
-return `http://metwdb-openaccess.ichec.ie/metno-wdb2ts/locationforecast?lat=${lat};long=${lon}`;
-}
-
-// Marine Institute ERDDAP dataset + station mapping (Clare/Shannon/Galway/Kerry)
-const ERDDAP_BASE = 'https://erddap.marine.ie/erddap/tabledap/IrishNationalTideGaugeNetwork.json';
-const PLACE_TABLE = [
-{ name: 'Doolin Port', lat: 53.0137, lon: -9.3773, tideStation: 'Galway Port' },
-{ name: 'Cliffs of Moher', lat: 52.9715, lon: -9.4309, tideStation: 'Galway Port' },
-{ name: 'Lahinch', lat: 52.9345, lon: -9.3489, tideStation: 'Galway Port' },
-{ name: 'Liscannor', lat: 52.9393, lon: -9.3978, tideStation: 'Galway Port' },
-{ name: 'Fanore', lat: 53.1400, lon: -9.2860, tideStation: 'Kinvara - Unreferenced' },
-{ name: 'Ballyvaughan', lat: 53.1159, lon: -9.1528, tideStation: 'Kinvara - Unreferenced' },
-{ name: 'Kilfenora', lat: 52.9899, lon: -9.2196, tideStation: 'Kinvara - Unreferenced' },
-{ name: 'Spanish Point', lat: 52.8416, lon: -9.4463, tideStation: 'Kilrush Lough' },
-{ name: 'White Strand', lat: 52.8399, lon: -9.4062, tideStation: 'Kilrush Lough' },
-{ name: 'Quilty', lat: 52.7865, lon: -9.4394, tideStation: 'Kilrush Lough' },
-{ name: 'Kilkee', lat: 52.6810, lon: -9.6502, tideStation: 'Kilrush Lough' },
-{ name: 'Kilrush', lat: 52.6399, lon: -9.4860, tideStation: 'Kilrush Lough' },
-{ name: 'Kinvarra', lat: 53.1407, lon: -8.9380, tideStation: 'Kinvara - Unreferenced' },
-{ name: 'Galway City', lat: 53.2700, lon: -9.0550, tideStation: 'Galway Port' },
-{ name: 'Shannon (Region)', lat: 52.7100, lon: -8.8680, tideStation: 'Kilrush Lough' },
-{ name: 'Dingle (Kerry)', lat: 52.1400, lon: -10.2700, tideStation: 'Dingle Harbour' },
-{ name: 'Tralee Bay (Kerry)', lat: 52.2700, lon: -9.7000, tideStation: 'Dingle Harbour' }
+// Weather stations (subset — expand later with full list)
+const weatherStations = [
+{ id: "SHANNON_AIRPORT", lat: 52.7, lon: -8.9 },
+{ id: "GALWAY_AIRPORT", lat: 53.3, lon: -8.9 },
+{ id: "VALENTIA_OBSERVATORY", lat: 51.93, lon: -10.25 }
 ];
 
-// Helper to go via Worker
-const viaProxy = (url) => `${WORKER_BASE}/proxy?url=${encodeURIComponent(url)}`;
+// Tide stations
+const tideStations = [
+{ id: "GALWAY_PORT", lat: 53.27, lon: -9.05 },
+{ id: "KILRUSH", lat: 52.63, lon: -9.5 },
+{ id: "FENIT", lat: 52.27, lon: -9.87 },
+{ id: "VALENTIA", lat: 51.93, lon: -10.25 }
+];
 
-// Populate location list
-const $sel = document.getElementById('locationSelect');
-PLACE_TABLE.forEach(p => {
-const opt = document.createElement('option');
-opt.value = p.name; opt.textContent = p.name;
-$sel.appendChild(opt);
+function haversine(lat1, lon1, lat2, lon2) {
+const R = 6371;
+const dLat = (lat2-lat1) * Math.PI/180;
+const dLon = (lon2-lon1) * Math.PI/180;
+const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function nearestStation(lat, lon, stations) {
+return stations.reduce((prev, cur) => {
+return (haversine(lat, lon, cur.lat, cur.lon) < haversine(lat, lon, prev.lat, prev.lon)) ? cur : prev;
 });
-$sel.value = 'Doolin Port';
-
-// Main refresh loop
-let timer;
-async function refreshAll() {
-const place = PLACE_TABLE.find(p => p.name === $sel.value) || PLACE_TABLE[0];
-document.getElementById('updatedAt').textContent =
-`Selected: ${place.name} · ${new Date().toLocaleString()}`;
-await Promise.all([
-loadWeather(place),
-loadTide(place),
-loadNews(place)
-]);
-}
-$sel.addEventListener('change', refreshAll);
-
-// WEATHER — Met Éireann WDB XML (forecast near now)
-async function loadWeather(place) {
-const out = document.getElementById('weatherBody');
-const sub = document.getElementById('weatherSub');
-const err = document.getElementById('weatherErr');
-err.textContent = ''; out.textContent = '…';
-
-try {
-const resp = await fetch(viaProxy(wdbUrl(place.lat, place.lon)));
-if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-const xmlText = await resp.text();
-
-// Parse XML and extract the first timestep
-const xml = new DOMParser().parseFromString(xmlText, 'text/xml');
-
-// Old WDB schema is similar to MET Norway "weatherdata > product > time"
-const timeNode = xml.querySelector('weatherdata product time');
-if (!timeNode) throw new Error('No forecast node');
-
-const loc = timeNode.querySelector('location');
-const temp = loc?.querySelector('temperature')?.getAttribute('value');
-const wind = loc?.querySelector('windSpeed')?.getAttribute('mps');
-const gust = loc?.querySelector('windGust')?.getAttribute('mps') || null;
-const wdir = loc?.querySelector('windDirection')?.getAttribute('code') || loc?.querySelector('windDirection')?.getAttribute('name');
-const press = loc?.querySelector('pressure')?.getAttribute('value');
-const cloud = loc?.querySelector('cloudiness')?.getAttribute('percent');
-
-const ms2kt = (m) => m == null ? null : (parseFloat(m) * 1.943844).toFixed(0);
-
-out.innerHTML =
-`Wind ${ms2kt(wind)} kt` +
-(gust ? ` (gust ${ms2kt(gust)} kt)` : '') +
-(temp ? ` · Temp ${parseFloat(temp).toFixed(0)}°C` : '');
-
-sub.textContent =
-`${wdir ? `Dir ${wdir} · ` : ''}${press ? `MSLP ${press} hPa · ` : ''}${cloud ? `Cloud ${cloud}%` : ''}`.replace(/\s·\s$/, '');
-
-} catch (e) {
-err.textContent = `Error fetching weather: ${e.message}`;
-out.textContent = '—';
-}
 }
 
-// TIDE — Marine Institute ERDDAP latest sample for a station
-async function loadTide(place) {
-const out = document.getElementById('tideBody');
-const sub = document.getElementById('tideSub');
-const err = document.getElementById('tideErr');
-err.textContent = ''; out.textContent = '…';
+async function updateData() {
+const query = document.getElementById("location").value || "Doolin";
 
-const station = place.tideStation;
-// Ask ERDDAP for the *latest* row in the last 6h for that station
-const url =
-`${ERDDAP_BASE}?time,Water_Level_LAT,Water_Level_OD_Malin,station_id` +
-`&station_id=${encodeURIComponent('"' + station + '"')}` +
-`&time>=now-6hours&orderByMax(%22time%22)`;
-
-try {
-const resp = await fetch(viaProxy(url));
-if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-const data = await resp.json();
-
-const cols = data?.table?.columnNames || [];
-const rows = data?.table?.rows || [];
-if (!rows.length) throw new Error('No tide rows');
-
-const row = rows[0];
-const idx = Object.fromEntries(cols.map((c,i)=>[c,i]));
-
-const tISO = row[idx.time];
-const wlLAT = row[idx.Water_Level_LAT]; // metres above LAT
-const wlOD = row[idx.Water_Level_OD_Malin]; // metres wrt OD Malin
-
-out.textContent = `${wlLAT?.toFixed(2)} m LAT`;
-sub.textContent = `Station: ${station} · ${new Date(tISO).toLocaleString()}`;
-} catch (e) {
-err.textContent = `Error fetching tidal data: ${e.message}`;
-out.textContent = '—';
-sub.textContent = `Station: ${station}`;
-}
-}
-
-// NEWS — Google News RSS for Coast Guard/RNLI around the chosen place
-async function loadNews(place) {
-const list = document.getElementById('newsList');
-const err = document.getElementById('newsErr');
-err.textContent = ''; list.innerHTML = '';
-
-const q = encodeURIComponent(`("Irish Coast Guard" OR RNLI) (${place.name} OR Clare OR "Cliffs of Moher" OR Doolin OR Lahinch)`);
-const rss = `https://news.google.com/rss/search?q=${q}&hl=en-IE&gl=IE&ceid=IE:en`;
-
-try {
-const resp = await fetch(viaProxy(rss));
-if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-const xmlText = await resp.text();
-const xml = new DOMParser().parseFromString(xmlText, 'text/xml');
-const items = [...xml.querySelectorAll('item')].slice(0, 8);
-
-if (!items.length) {
-list.innerHTML = '<li>No local SAR items found in the last few days.</li>';
+// Geocode via OpenStreetMap Nominatim
+const geoUrl = proxy + encodeURIComponent(`https://nominatim.openstreetmap.org/search?format=json&q=${query},Ireland`);
+const geoResp = await fetch(geoUrl);
+const geoData = await geoResp.json();
+if (!geoData.length) {
+document.getElementById("weatherData").textContent = "Location not found.";
+document.getElementById("tideData").textContent = "";
 return;
 }
+const lat = parseFloat(geoData[0].lat);
+const lon = parseFloat(geoData[0].lon);
 
-for (const it of items) {
-const title = it.querySelector('title')?.textContent || 'Untitled';
-let link = it.querySelector('link')?.textContent || '#';
-// Google News links often wrap ?url=actual
+// Find nearest stations
+const nearestWeather = nearestStation(lat, lon, weatherStations);
+const nearestTide = nearestStation(lat, lon, tideStations);
+
+// WEATHER
 try {
-const u = new URL(link);
-if (u.searchParams.get('url')) link = u.searchParams.get('url');
-} catch {}
-const date = new Date(it.querySelector('pubDate')?.textContent || Date.now());
-const li = document.createElement('li');
-li.innerHTML = `<a href="${link}" target="_blank" rel="noopener">${title}</a><div class="date">${date.toLocaleString()}</div>`;
-list.appendChild(li);
-}
+const weatherUrl = proxy + encodeURIComponent(`https://prodapi.metweb.ie/observations/${nearestWeather.id}`);
+const w = await fetch(weatherUrl);
+const weather = await w.json();
+document.getElementById("weatherData").innerHTML = `
+<strong>${nearestWeather.id}</strong><br>
+Temp: ${weather.report.temperature} °C<br>
+Wind: ${weather.report.wind_speed} kt (${weather.report.wind_direction_text})<br>
+Gusts: ${weather.report.wind_gust} kt<br>
+Pressure: ${weather.report.pressure} hPa
+`;
 } catch (e) {
-err.textContent = `Error fetching news: ${e.message}`;
+document.getElementById("weatherData").textContent = "Error fetching weather.";
+}
+
+// TIDES (next 12h only)
+try {
+const tideUrl = proxy + encodeURIComponent(
+`https://erddap.marine.ie/erddap/tabledap/I_NATIONAL_TIDE_GAUGE_NETWORK.json?station_id,sea_surface_height,time&station_id="${nearestTide.id}"&time>=now&time<=now+12hours`
+);
+const t = await fetch(tideUrl);
+const tides = await t.json();
+const rows = tides.table.rows.map(r => {
+const [id, height, time] = r;
+return `<li>${new Date(time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} — ${height.toFixed(2)} m</li>`;
+}).join("");
+document.getElementById("tideData").innerHTML = `<strong>${nearestTide.id}</strong><br><ul style="list-style:none; padding:0">${rows}</ul>`;
+} catch (e) {
+document.getElementById("tideData").textContent = "Error fetching tides.";
+}
+
+// SAR NEWS (simple RSS search)
+try {
+const newsUrl = proxy + encodeURIComponent("https://news.google.com/rss/search?q=Irish+Coast+Guard+SAR&hl=en-IE&gl=IE&ceid=IE:en");
+const n = await fetch(newsUrl);
+const text = await n.text();
+const parser = new DOMParser();
+const xml = parser.parseFromString(text, "text/xml");
+const items = xml.querySelectorAll("item");
+let html = "<ul style='list-style:none; padding:0'>";
+items.forEach((item, idx) => {
+if (idx < 5) {
+html += `<li><a href="${item.querySelector("link").textContent}" target="_blank" style="color:#fff">${item.querySelector("title").textContent}</a></li>`;
+}
+});
+html += "</ul>";
+document.getElementById("newsData").innerHTML = html;
+} catch (e) {
+document.getElementById("newsData").textContent = "Error fetching news.";
 }
 }
 
-// First run + interval
-(async function init(){
-if (!WORKER_BASE || WORKER_BASE.includes('YOURNAME')) {
-alert('Configure WORKER_BASE with your Cloudflare Worker URL first.');
-}
-await refreshAll();
-clearInterval(timer);
-timer = setInterval(refreshAll, REFRESH_MS);
-})();
+// Auto-refresh every 60s
+setInterval(updateData, 60000);
+window.onload = updateData;
 </script>
 </body>
 </html>
