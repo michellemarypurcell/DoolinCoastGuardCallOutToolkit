@@ -1,128 +1,193 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-<meta charset="UTF-8">
-<title>Irish Coast Guard - Doolin Unit - SAR Call Out Vitals</title>
+<meta charset="utf-8">
+<title>Doolin Coast Guard SAR Call Out Toolkit</title>
 <style>
+/* Background image */
 body {
-margin: 0;
 font-family: Arial, sans-serif;
-background: url('background.jpg') no-repeat top center fixed;
-background-size: cover;
-color: white;
+margin: 0;
+padding: 0;
+height: 100vh;
+overflow: hidden;
+color: #fff;
 text-align: center;
-padding: 20px;
 }
-.overlay {
-background: rgba(0, 0, 0, 0.7);
-padding: 20px;
-border-radius: 10px;
+
+/* Coast Guard background image */
+body::before {
+content: "";
+position: fixed;
+top: 0; left: 0; right: 0; bottom: 0;
+background: url('A54EFB4F-6F2B-4588-8482-029455F12395.jpeg') no-repeat center center fixed;
+background-size: cover;
+z-index: -2;
+}
+
+/* Dark overlay to keep text readable */
+body::after {
+content: "";
+position: fixed;
+top: 0; left: 0; right: 0; bottom: 0;
+background: rgba(0,0,0,0.55);
+z-index: -1;
+}
+
+h1 {
+color: #ffcc00;
+background: rgba(0,0,0,0.6);
 display: inline-block;
+padding: 10px 20px;
+border-radius: 8px;
 margin-top: 20px;
 }
-h1, h2 {
-margin: 10px 0;
-}
+
 .widget {
-margin: 15px auto;
-padding: 15px;
-background: rgba(255,255,255,0.15);
-border-radius: 12px;
-width: 320px;
-text-align: center;
+border: 2px solid #ffcc00;
+margin: 20px auto;
+padding: 20px;
+border-radius: 10px;
+background: rgba(0,0,0,0.6);
+max-width: 800px;
 }
-.icon {
-font-size: 3rem;
-margin: 10px 0;
+
+select, button {
+padding: 10px;
+font-size: 1.2em;
+margin: 5px;
 }
-#last-updated {
-font-size: 0.8rem;
-margin-top: 10px;
-opacity: 0.8;
-}
+
+a { color: #ffcc00; }
 </style>
 </head>
 <body>
-<div class="overlay">
-<h1>Irish Coast Guard - Doolin Unit</h1>
-<h2>SAR Call Out Vitals</h2>
-
-<div class="widget">
-<h3>🌤️ Weather (Met Éireann)</h3>
-<div class="icon" id="weather-icon">⏳</div>
-<div id="weather">Loading...</div>
+<h1>Doolin Coast Guard SAR Call Out Toolkit</h1>
+<div>
+<label for="location">Select location: </label>
+<select id="location">
+<option value="DOOLIN">Doolin</option>
+<option value="DOOLIN PORT">Doolin Port</option>
+<option value="FANORE">Fanore</option>
+<option value="BALLYVAUGHAN">Ballyvaughan</option>
+<option value="KINVARA">Kinvara</option>
+<option value="KILFENORA">Kilfenora</option>
+<option value="LISCANNOR">Liscannor</option>
+<option value="CLIFFS OF MOHER">Cliffs of Moher</option>
+<option value="LAHINCH">Lahinch</option>
+<option value="SPANISH POINT">Spanish Point</option>
+<option value="QUILTY">Quilty</option>
+<option value="WHITE STRAND">White Strand</option>
+<option value="KILKEE">Kilkee</option>
+<option value="KILRUSH">Kilrush</option>
+<option value="SHANNON">Shannon</option>
+<option value="GALWAY">Galway</option>
+<option value="GALWAY CITY">Galway City</option>
+<option value="DINGLE">Dingle</option>
+<option value="TRALEE">Tralee</option>
+<option value="FENIT">Fenit</option>
+<option value="KERRY">Kerry</option>
+</select>
+<button onclick="updateAll()">Update</button>
 </div>
 
-<div class="widget">
-<h3>🌊 Tide (Lahinch Gauge)</h3>
-<div class="icon">🌊</div>
-<div id="tide">Loading...</div>
-</div>
-
-<div id="last-updated"></div>
-</div>
+<div id="weather" class="widget">Loading weather...</div>
+<div id="tides" class="widget">Loading tides...</div>
+<div id="news" class="widget">Loading news...</div>
 
 <script>
-const lat = 53.0166;
-const lon = -9.3772;
-
-async function fetchWeather() {
-try {
-const res = await fetch(`https://corsproxy.io/?https://prodapi.met.ie/weather/api/location/${lat}/${lon}/forecast/`);
-const data = await res.json();
-
-// Take first period (current/nearest forecast)
-const current = data[0];
-
-const temp = current.temperature;
-const wind = current.windSpeed;
-const condition = current.symbol; // icon code
-
-document.getElementById("weather").innerText =
-`${temp}°C | Wind ${wind} km/h`;
-
-// Simple mapping of Met Eireann symbol codes to emojis
-const icons = {
-"sunny": "☀️",
-"partly-cloudy": "🌤️",
-"cloudy": "☁️",
-"rain": "🌧️",
-"showers": "🌦️",
-"thunder": "⛈️",
-"snow": "❄️"
+// --- Lookup table ---
+const stationLookup = {
+"FANORE": { tide: "Galway Port", weather: "SHANNON_AIRPORT" },
+"BALLYVAUGHAN": { tide: "Galway Port", weather: "SHANNON_AIRPORT" },
+"KINVARA": { tide: "Kinvara - Unreferenced", weather: "ATHENRY" },
+"DOOLIN": { tide: "Galway Port", weather: "SHANNON_AIRPORT" },
+"DOOLIN PORT": { tide: "Galway Port", weather: "SHANNON_AIRPORT" },
+"CLIFFS OF MOHER": { tide: "Galway Port", weather: "SHANNON_AIRPORT" },
+"LISCANNOR": { tide: "Galway Port", weather: "SHANNON_AIRPORT" },
+"LAHINCH": { tide: "Galway Port", weather: "SHANNON_AIRPORT" },
+"SPANISH POINT": { tide: "Kilrush Lough", weather: "SHANNON_AIRPORT" },
+"QUILTY": { tide: "Kilrush Lough", weather: "SHANNON_AIRPORT" },
+"WHITE STRAND": { tide: "Kilrush Lough", weather: "SHANNON_AIRPORT" },
+"KILKEE": { tide: "Kilrush Lough", weather: "SHANNON_AIRPORT" },
+"KILRUSH": { tide: "Kilrush Lough", weather: "SHANNON_AIRPORT" },
+"KILFENORA": { tide: "Galway Port", weather: "SHANNON_AIRPORT" },
+"SHANNON": { tide: "Kilrush Lough", weather: "SHANNON_AIRPORT" },
+"GALWAY": { tide: "Galway Port", weather: "ATHENRY" },
+"GALWAY CITY": { tide: "Galway Port", weather: "ATHENRY" },
+"DINGLE": { tide: "Dingle Harbour", weather: "VALENTIA_OBSERVATORY" },
+"TRALEE": { tide: "Dingle Harbour", weather: "VALENTIA_OBSERVATORY" },
+"FENIT": { tide: "Dingle Harbour", weather: "VALENTIA_OBSERVATORY" },
+"KERRY": { tide: "Dingle Harbour", weather: "VALENTIA_OBSERVATORY" }
 };
-document.getElementById("weather-icon").innerText =
-icons[condition] || "🌡️";
+const DEFAULT_STATIONS = { tide: "Galway Port", weather: "SHANNON_AIRPORT" };
 
-} catch (err) {
-document.getElementById("weather").innerText = "Error fetching Met Éireann data.";
-document.getElementById("weather-icon").innerText = "⚠️";
-}
-}
-
-async function fetchTide() {
+// --- Weather ---
+async function loadWeather(stationId) {
 try {
-const res = await fetch("https://corsproxy.io/?https://erddap.marine.ie/erddap/tabledap/IrelandTideGauge.json?time%2Cwaterlevel&station=Lahinch&orderBy(%22time%20desc%22)&limit=1");
-const data = await res.json();
-const latest = data.table.rows[0]; // [time, waterlevel]
-const time = new Date(latest[0]).toLocaleTimeString();
-const level = latest[1].toFixed(2);
-document.getElementById("tide").innerText =
-`${level} m at ${time}`;
-} catch (err) {
-document.getElementById("tide").innerText = "Error fetching tide data.";
+const url = `https://prodapi.metweb.ie/observations/${stationId}`;
+const response = await fetch(url);
+const data = await response.json();
+document.getElementById("weather").innerHTML = `
+<h2>Weather</h2>
+<p>Station: ${stationId}</p>
+<p>Temp: ${data.temperature.value} °C</p>
+<p>Wind: ${data.windSpeed.value} km/h</p>
+<p>Condition: ${data.weatherDescription}</p>
+`;
+} catch {
+document.getElementById("weather").innerHTML = "Weather unavailable.";
 }
 }
 
+// --- Tides ---
+async function loadTides(station) {
+try {
+const url = `https://erddap.marine.ie/erddap/tabledap/I_NATIONAL_TIDE_GAUGE_NETWORK.json?station_id,sea_surface_height,time&station_id="${station}"&time>=now-1day&time<=now+1day`;
+const response = await fetch(url);
+const data = await response.json();
+let rows = data.table.rows;
+let html = `<h2>Tides</h2><p>Station: ${station}</p><ul>`;
+rows.slice(-5).forEach(r => {
+const [stn, height, time] = r;
+html += `<li>${new Date(time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} → ${height.toFixed(2)} m</li>`;
+});
+html += "</ul>";
+document.getElementById("tides").innerHTML = html;
+} catch {
+document.getElementById("tides").innerHTML = "Tidal data unavailable.";
+}
+}
+
+// --- SAR News ---
+async function loadNews(query) {
+try {
+const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}`;
+const response = await fetch("https://api.rss2json.com/v1/api.json?rss_url=" + rssUrl);
+const data = await response.json();
+let html = "<h2>SAR News</h2><ul>";
+data.items.slice(0, 5).forEach(item => {
+html += `<li><a href="${item.link}" target="_blank">${item.title}</a></li>`;
+});
+html += "</ul>";
+document.getElementById("news").innerHTML = html;
+} catch {
+document.getElementById("news").innerHTML = "News unavailable.";
+}
+}
+
+// --- Master update ---
 function updateAll() {
-fetchWeather();
-fetchTide();
-document.getElementById("last-updated").innerText =
-"Last updated: " + new Date().toLocaleTimeString();
+let loc = document.getElementById("location").value;
+let station = stationLookup[loc] || DEFAULT_STATIONS;
+loadWeather(station.weather);
+loadTides(station.tide);
+loadNews(loc + " SAR");
 }
 
+// Auto refresh every minute
 updateAll();
-setInterval(updateAll, 5 * 60 * 1000); // refresh every 5 min
+setInterval(updateAll, 60000);
 </script>
 </body>
 </html>
