@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Doolin Coast Guard SAR Call Out Toolkit</title>
+<style>
+/* Background image */
+body {
+font-family: Arial, sans-serif;
+margin: 0;
+padding: 0;
+height: 100vh;
+overflow: hidden;
+color: #fff;
+text-align: center;
+}
+
+/* Coast Guard background image */
+body::before {
+content: "";
+position: fixed;
+top: 0; left: 0; right: 0; bottom: 0;
+background: url('background.jpg') no-repeat top center fixed;
+background-size: cover;
+z-index: -2;
+
+}
+
+/* Dark overlay to keep text readable 
+body::after {
+content: "";
+position: fixed;
+top: 0; left: 0; right: 0; bottom: 0;
+background: rgba(0,0,0,0.55);
+z-index: -1;
+}
+*/
+
+h1 {
+color: #ffcc00;
+background: rgba(0,0,0,0.6);
+display: inline-block;
+padding: 10px 20px;
+border-radius: 8px;
+margin-top: 20px;
+}
+
+.widget {
+border: 2px solid #ffcc00;
+margin: 20px auto;
+padding: 20px;
+border-radius: 10px;
+background: rgba(0,0,0,0.6);
+max-width: 800px;
+}
+
+select, button {
+padding: 10px;
+font-size: 1.2em;
+margin: 5px;
+}
+
+a { color: #ffcc00; }
+</style>
+</head>
+<body>
+<h1>Doolin Coast Guard SAR Call Out Toolkit</h1>
+<div>
+<label for="location">Select location: </label>
+<select id="location">
+<option value="DOOLIN">Doolin</option>
+<option value="DOOLIN PORT">Doolin Port</option>
+<option value="FANORE">Fanore</option>
+<option value="BALLYVAUGHAN">Ballyvaughan</option>
+<option value="KINVARA">Kinvara</option>
+<option value="KILFENORA">Kilfenora</option>
+<option value="LISCANNOR">Liscannor</option>
+<option value="CLIFFS OF MOHER">Cliffs of Moher</option>
+<option value="LAHINCH">Lahinch</option>
+<option value="SPANISH POINT">Spanish Point</option>
+<option value="QUILTY">Quilty</option>
+<option value="WHITE STRAND">White Strand</option>
+<option value="KILKEE">Kilkee</option>
+<option value="KILRUSH">Kilrush</option>
+<option value="SHANNON">Shannon</option>
+<option value="GALWAY">Galway</option>
+<option value="GALWAY CITY">Galway City</option>
+<option value="DINGLE">Dingle</option>
+<option value="TRALEE">Tralee</option>
+<option value="FENIT">Fenit</option>
+<option value="KERRY">Kerry</option>
+</select>
+<button onclick="updateAll()">Update</button>
+</div>
+
+<div id="weather" class="widget">Loading weather...</div>
+<div id="tides" class="widget">Loading tides...</div>
+<div id="news" class="widget">Loading news...</div>
+
+<script>
+// --- Lookup table ---
+const stationLookup = {
+"FANORE": { tide: "Galway Port", weather: "SHANNON_AIRPORT" },
+"BALLYVAUGHAN": { tide: "Galway Port", weather: "SHANNON_AIRPORT" },
+"KINVARA": { tide: "Kinvara - Unreferenced", weather: "ATHENRY" },
+"DOOLIN": { tide: "Galway Port", weather: "SHANNON_AIRPORT" },
+"DOOLIN PORT": { tide: "Galway Port", weather: "SHANNON_AIRPORT" },
+"CLIFFS OF MOHER": { tide: "Galway Port", weather: "SHANNON_AIRPORT" },
+"LISCANNOR": { tide: "Galway Port", weather: "SHANNON_AIRPORT" },
+"LAHINCH": { tide: "Galway Port", weather: "SHANNON_AIRPORT" },
+"SPANISH POINT": { tide: "Kilrush Lough", weather: "SHANNON_AIRPORT" },
+"QUILTY": { tide: "Kilrush Lough", weather: "SHANNON_AIRPORT" },
+"WHITE STRAND": { tide: "Kilrush Lough", weather: "SHANNON_AIRPORT" },
+"KILKEE": { tide: "Kilrush Lough", weather: "SHANNON_AIRPORT" },
+"KILRUSH": { tide: "Kilrush Lough", weather: "SHANNON_AIRPORT" },
+"KILFENORA": { tide: "Galway Port", weather: "SHANNON_AIRPORT" },
+"SHANNON": { tide: "Kilrush Lough", weather: "SHANNON_AIRPORT" },
+"GALWAY": { tide: "Galway Port", weather: "ATHENRY" },
+"GALWAY CITY": { tide: "Galway Port", weather: "ATHENRY" },
+"DINGLE": { tide: "Dingle Harbour", weather: "VALENTIA_OBSERVATORY" },
+"TRALEE": { tide: "Dingle Harbour", weather: "VALENTIA_OBSERVATORY" },
+"FENIT": { tide: "Dingle Harbour", weather: "VALENTIA_OBSERVATORY" },
+"KERRY": { tide: "Dingle Harbour", weather: "VALENTIA_OBSERVATORY" }
+};
+const DEFAULT_STATIONS = { tide: "Galway Port", weather: "SHANNON_AIRPORT" };
+
+// --- Weather ---
+async function loadWeather(stationId) {
+try {
+const url = `https://prodapi.metweb.ie/observations/${stationId}`;
+const response = await fetch(url);
+const data = await response.json();
+document.getElementById("weather").innerHTML = `
+<h2>Weather</h2>
+<p>Station: ${stationId}</p>
+<p>Temp: ${data.temperature.value} °C</p>
+<p>Wind: ${data.windSpeed.value} km/h</p>
+<p>Condition: ${data.weatherDescription}</p>
+`;
+} catch {
+document.getElementById("weather").innerHTML = "Weather unavailable.";
+}
+}
+
+// --- Tides ---
+async function loadTides(station) {
+try {
+const url = `https://erddap.marine.ie/erddap/tabledap/I_NATIONAL_TIDE_GAUGE_NETWORK.json?station_id,sea_surface_height,time&station_id="${station}"&time>=now-1day&time<=now+1day`;
+const response = await fetch(url);
+const data = await response.json();
+let rows = data.table.rows;
+let html = `<h2>Tides</h2><p>Station: ${station}</p><ul>`;
+rows.slice(-5).forEach(r => {
+const [stn, height, time] = r;
+html += `<li>${new Date(time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} → ${height.toFixed(2)} m</li>`;
+});
+html += "</ul>";
+document.getElementById("tides").innerHTML = html;
+} catch {
+document.getElementById("tides").innerHTML = "Tidal data unavailable.";
+}
+}
+
+// --- SAR News ---
+async function loadNews(query) {
+try {
+const rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}`;
+const response = await fetch("https://api.rss2json.com/v1/api.json?rss_url=" + rssUrl);
+const data = await response.json();
+let html = "<h2>SAR News</h2><ul>";
+data.items.slice(0, 5).forEach(item => {
+html += `<li><a href="${item.link}" target="_blank">${item.title}</a></li>`;
+});
+html += "</ul>";
+document.getElementById("news").innerHTML = html;
+} catch {
+document.getElementById("news").innerHTML = "News unavailable.";
+}
+}
+
+// --- Master update ---
+function updateAll() {
+let loc = document.getElementById("location").value;
+let station = stationLookup[loc] || DEFAULT_STATIONS;
+loadWeather(station.weather);
+loadTides(station.tide);
+loadNews(loc + " SAR");
+}
+
+// Auto refresh every minute
+updateAll();
+setInterval(updateAll, 60000);
+</script>
+</body>
+</html>
