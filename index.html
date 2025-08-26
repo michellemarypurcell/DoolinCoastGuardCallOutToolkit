@@ -36,7 +36,7 @@ padding: 30px;
 border-radius: 15px;
 width: 90%;
 max-width: 800px;
-font-size: 1.8em;
+font-size: 1.6em;
 text-align: left;
 }
 
@@ -46,10 +46,35 @@ font-size: 2em;
 text-align: center;
 }
 
-select, button {
+label {
+font-weight: bold;
 font-size: 1.5em;
+}
+
+select, button {
+font-size: 1.3em;
 padding: 10px;
 margin: 10px;
+}
+
+#status {
+margin-top: 10px;
+font-size: 1.2em;
+font-style: italic;
+}
+
+#debug {
+position: fixed;
+bottom: 0;
+left: 0;
+width: 100%;
+background: rgba(0,0,0,0.7);
+color: #0f0;
+font-size: 0.8em;
+text-align: left;
+padding: 5px;
+max-height: 150px;
+overflow:auto;
 }
 </style>
 </head>
@@ -57,9 +82,9 @@ margin: 10px;
 <h1>Doolin Coast Guard SAR Call Out Toolkit</h1>
 
 <div>
-<label for="location">Choose a location: </label>
+<label for="location">Change location:</label>
 <select id="location">
-<option value="DOOLIN">Doolin</option>
+<option value="DOOLIN" selected>Doolin Port</option>
 <option value="KILKEE">Kilkee</option>
 <option value="LAHINCH">Lahinch</option>
 <option value="SPANISH_POINT">Spanish Point</option>
@@ -69,6 +94,7 @@ margin: 10px;
 <option value="DINGLE">Dingle</option>
 </select>
 <button onclick="updateData()">Update</button>
+<div id="status">Loading...</div>
 </div>
 
 <div class="container">
@@ -88,8 +114,9 @@ margin: 10px;
 </div>
 </div>
 
+<div id="debug"></div>
+
 <script>
-// 👇 replace with your deployed Cloudflare Worker URL
 const proxy = "https://doolin-sar-proxy.michellemarypurcell.workers.dev/?url=";
 
 const stationLookup = {
@@ -106,10 +133,18 @@ const stationLookup = {
 async function updateData() {
 const loc = document.getElementById("location").value;
 const station = stationLookup[loc];
+const debugDiv = document.getElementById("debug");
+debugDiv.innerHTML = "";
+
+// status
+const now = new Date();
+document.getElementById("status").innerHTML =
+`Currently showing: <b>${loc}</b> (Last updated: ${now.toLocaleString()})`;
 
 // WEATHER
 try {
 const weatherUrl = proxy + encodeURIComponent(`https://prodapi.metweb.ie/observations/${station.weather}`);
+debugDiv.innerHTML += `<div>Fetching weather: ${weatherUrl}</div>`;
 const w = await fetch(weatherUrl);
 const weather = await w.json();
 document.getElementById("weatherData").innerHTML = `
@@ -121,6 +156,7 @@ Pressure: ${weather.report.pressure} hPa
 `;
 } catch (e) {
 document.getElementById("weatherData").textContent = "Error fetching weather.";
+debugDiv.innerHTML += `<div style="color:red">Weather error: ${e}</div>`;
 }
 
 // TIDES
@@ -128,20 +164,24 @@ try {
 const tideUrl = proxy + encodeURIComponent(
 `https://erddap.marine.ie/erddap/tabledap/I_NATIONAL_TIDE_GAUGE_NETWORK.json?station_id,sea_surface_height,time&station_id="${station.tide}"&time>=now&time<=now+12hours`
 );
+debugDiv.innerHTML += `<div>Fetching tides: ${tideUrl}</div>`;
 const t = await fetch(tideUrl);
 const tides = await t.json();
 const rows = tides.table.rows.map(r => {
 const [id, height, time] = r;
 return `<li>${new Date(time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} — ${height.toFixed(2)} m</li>`;
 }).join("");
-document.getElementById("tideData").innerHTML = `<strong>${station.tide}</strong><br><ul style="list-style:none; padding:0">${rows}</ul>`;
+document.getElementById("tideData").innerHTML =
+`<strong>${station.tide}</strong><br><ul style="list-style:none; padding:0">${rows}</ul>`;
 } catch (e) {
 document.getElementById("tideData").textContent = "Error fetching tides.";
+debugDiv.innerHTML += `<div style="color:red">Tide error: ${e}</div>`;
 }
 
 // SAR NEWS
 try {
 const newsUrl = proxy + encodeURIComponent("https://news.google.com/rss/search?q=Irish+Coast+Guard+SAR&hl=en-IE&gl=IE&ceid=IE:en");
+debugDiv.innerHTML += `<div>Fetching news: ${newsUrl}</div>`;
 const n = await fetch(newsUrl);
 const text = await n.text();
 const parser = new DOMParser();
@@ -157,6 +197,7 @@ html += "</ul>";
 document.getElementById("newsData").innerHTML = html;
 } catch (e) {
 document.getElementById("newsData").textContent = "Error fetching news.";
+debugDiv.innerHTML += `<div style="color:red">News error: ${e}</div>`;
 }
 }
 
