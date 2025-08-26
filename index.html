@@ -32,27 +32,27 @@ max-width: 1200px;
 
 .widget {
 background: rgba(0, 0, 0, 0.65);
-padding: 30px;
+padding: 40px;
 border-radius: 15px;
 width: 90%;
-max-width: 800px;
-font-size: 1.6em;
+max-width: 900px;
+font-size: 1.8em;
 text-align: left;
 }
 
 .widget h2 {
 margin-top: 0;
-font-size: 2em;
+font-size: 2.2em;
 text-align: center;
 }
 
 label {
 font-weight: bold;
-font-size: 1.5em;
+font-size: 1.6em;
 }
 
 select, button {
-font-size: 1.3em;
+font-size: 1.4em;
 padding: 10px;
 margin: 10px;
 }
@@ -117,8 +117,10 @@ overflow:auto;
 <div id="debug"></div>
 
 <script>
+// Cloudflare Worker proxy endpoint
 const proxy = "https://doolin-sar-proxy.michellemarypurcell.workers.dev/?url=";
 
+// Location → station lookup
 const stationLookup = {
 "DOOLIN": { tide: "GALWAY_PORT", weather: "SHANNON_AIRPORT" },
 "KILKEE": { tide: "KILRUSH", weather: "SHANNON_AIRPORT" },
@@ -136,7 +138,7 @@ const station = stationLookup[loc];
 const debugDiv = document.getElementById("debug");
 debugDiv.innerHTML = "";
 
-// status
+// status with timestamp
 const now = new Date();
 document.getElementById("status").innerHTML =
 `Currently showing: <b>${loc}</b> (Last updated: ${now.toLocaleString()})`;
@@ -207,3 +209,4 @@ window.onload = updateData;
 </script>
 </body>
 </html>
+
