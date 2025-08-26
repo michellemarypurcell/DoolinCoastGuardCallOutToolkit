@@ -17,7 +17,42 @@ padding: 0;
 h1 {
 background: rgba(0, 0, 0, 0.6);
 padding: 20px;
-font-size: 3em;
+font-size: 2.5em;
+margin: 0;
+}
+
+#locationBox {
+position: absolute;
+top: 10px;
+right: 10px;
+background: rgba(0,0,0,0.5);
+padding: 5px 10px;
+border-radius: 8px;
+font-size: 0.9em;
+}
+
+#locationBox label {
+font-weight: bold;
+margin-right: 5px;
+}
+
+#pageTitle {
+margin-top: 80px;
+font-size: 2em;
+font-weight: bold;
+}
+
+#subtitle {
+font-size: 1.4em;
+margin-bottom: 10px;
+}
+
+#lastUpdated {
+background: #0077cc;
+color: white;
+padding: 5px;
+font-size: 1.2em;
+margin-bottom: 20px;
 }
 
 .container {
@@ -46,23 +81,6 @@ font-size: 2.2em;
 text-align: center;
 }
 
-label {
-font-weight: bold;
-font-size: 1.6em;
-}
-
-select, button {
-font-size: 1.4em;
-padding: 10px;
-margin: 10px;
-}
-
-#status {
-margin-top: 10px;
-font-size: 1.2em;
-font-style: italic;
-}
-
 #debug {
 position: fixed;
 bottom: 0;
@@ -81,9 +99,9 @@ overflow:auto;
 <body>
 <h1>Doolin Coast Guard SAR Call Out Toolkit</h1>
 
-<div>
+<div id="locationBox">
 <label for="location">Change location:</label>
-<select id="location">
+<select id="location" onchange="updateData()">
 <option value="DOOLIN" selected>Doolin Port</option>
 <option value="KILKEE">Kilkee</option>
 <option value="LAHINCH">Lahinch</option>
@@ -93,9 +111,11 @@ overflow:auto;
 <option value="TRALEE">Tralee</option>
 <option value="DINGLE">Dingle</option>
 </select>
-<button onclick="updateData()">Update</button>
-<div id="status">Loading...</div>
 </div>
+
+<div id="pageTitle">Doolin IRCG Unit</div>
+<div id="subtitle">Call out data for location</div>
+<div id="lastUpdated">Last updated: loading…</div>
 
 <div class="container">
 <div class="widget">
@@ -117,10 +137,9 @@ overflow:auto;
 <div id="debug"></div>
 
 <script>
-// Cloudflare Worker proxy endpoint
 const proxy = "https://doolin-sar-proxy.michellemarypurcell.workers.dev/?url=";
 
-// Location → station lookup
+// Map locations to Met Éireann + Marine Institute stations
 const stationLookup = {
 "DOOLIN": { tide: "GALWAY_PORT", weather: "SHANNON_AIRPORT" },
 "KILKEE": { tide: "KILRUSH", weather: "SHANNON_AIRPORT" },
@@ -138,14 +157,17 @@ const station = stationLookup[loc];
 const debugDiv = document.getElementById("debug");
 debugDiv.innerHTML = "";
 
-// status with timestamp
+document.getElementById("pageTitle").textContent = `${loc} IRCG Unit`;
+
 const now = new Date();
-document.getElementById("status").innerHTML =
-`Currently showing: <b>${loc}</b> (Last updated: ${now.toLocaleString()})`;
+document.getElementById("lastUpdated").textContent =
+`Last updated: ${now.toLocaleString()}`;
 
 // WEATHER
 try {
-const weatherUrl = proxy + encodeURIComponent(`https://prodapi.metweb.ie/observations/${station.weather}`);
+const weatherUrl = proxy + encodeURIComponent(
+`https://prodapi.metweb.ie/observations/${station.weather}?format=json`
+);
 debugDiv.innerHTML += `<div>Fetching weather: ${weatherUrl}</div>`;
 const w = await fetch(weatherUrl);
 const weather = await w.json();
@@ -163,8 +185,12 @@ debugDiv.innerHTML += `<div style="color:red">Weather error: ${e}</div>`;
 
 // TIDES
 try {
+const start = new Date();
+const end = new Date(start.getTime() + 12 * 3600 * 1000);
+const startISO = start.toISOString();
+const endISO = end.toISOString();
 const tideUrl = proxy + encodeURIComponent(
-`https://erddap.marine.ie/erddap/tabledap/I_NATIONAL_TIDE_GAUGE_NETWORK.json?station_id,sea_surface_height,time&station_id="${station.tide}"&time>=now&time<=now+12hours`
+`https://erddap.marine.ie/erddap/tabledap/I_NATIONAL_TIDE_GAUGE_NETWORK.json?station_id,sea_surface_height,time&station_id="${station.tide}"&time>=${startISO}&time<=${endISO}`
 );
 debugDiv.innerHTML += `<div>Fetching tides: ${tideUrl}</div>`;
 const t = await fetch(tideUrl);
@@ -203,10 +229,8 @@ debugDiv.innerHTML += `<div style="color:red">News error: ${e}</div>`;
 }
 }
 
-// Auto-refresh every 60s
 setInterval(updateData, 60000);
 window.onload = updateData;
 </script>
 </body>
 </html>
-
