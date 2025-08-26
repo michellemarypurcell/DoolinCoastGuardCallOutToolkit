@@ -46,7 +46,7 @@ font-size: 2em;
 text-align: center;
 }
 
-input, button {
+select, button {
 font-size: 1.5em;
 padding: 10px;
 margin: 10px;
@@ -57,86 +57,63 @@ margin: 10px;
 <h1>Doolin Coast Guard SAR Call Out Toolkit</h1>
 
 <div>
-<input type="text" id="location" placeholder="Enter a location">
-<button onclick="updateData()">Go</button>
+<label for="location">Choose a location: </label>
+<select id="location">
+<option value="DOOLIN">Doolin</option>
+<option value="KILKEE">Kilkee</option>
+<option value="LAHINCH">Lahinch</option>
+<option value="SPANISH_POINT">Spanish Point</option>
+<option value="KINVARA">Kinvara</option>
+<option value="GALWAY">Galway</option>
+<option value="TRALEE">Tralee</option>
+<option value="DINGLE">Dingle</option>
+</select>
+<button onclick="updateData()">Update</button>
 </div>
 
 <div class="container">
 <div class="widget">
 <h2>Weather</h2>
-<div id="weatherData">Loading latest weather data...</div>
+<div id="weatherData">Loading...</div>
 </div>
 
 <div class="widget">
 <h2>Tides</h2>
-<div id="tideData">Loading latest tidal information...</div>
+<div id="tideData">Loading...</div>
 </div>
 
 <div class="widget">
 <h2>SAR News</h2>
-<div id="newsData">Loading search and rescue news feed ...</div>
+<div id="newsData">Loading...</div>
 </div>
 </div>
 
 <script>
-// 👇 replace this with your actual Cloudflare Worker URL once deployed
-const proxy = "https://doolin-sar-proxy.michellemarypurcell.workers.dev/?url=";
+// 👇 replace with your deployed Cloudflare Worker URL
+const proxy = "https://doolin-sar-proxy.username.workers.dev/?url=";
 
-// Weather stations (subset — expand later with full list)
-const weatherStations = [
-{ id: "SHANNON_AIRPORT", lat: 52.7, lon: -8.9 },
-{ id: "GALWAY_AIRPORT", lat: 53.3, lon: -8.9 },
-{ id: "VALENTIA_OBSERVATORY", lat: 51.93, lon: -10.25 }
-];
-
-// Tide stations
-const tideStations = [
-{ id: "GALWAY_PORT", lat: 53.27, lon: -9.05 },
-{ id: "KILRUSH", lat: 52.63, lon: -9.5 },
-{ id: "FENIT", lat: 52.27, lon: -9.87 },
-{ id: "VALENTIA", lat: 51.93, lon: -10.25 }
-];
-
-function haversine(lat1, lon1, lat2, lon2) {
-const R = 6371;
-const dLat = (lat2-lat1) * Math.PI/180;
-const dLon = (lon2-lon1) * Math.PI/180;
-const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
-
-function nearestStation(lat, lon, stations) {
-return stations.reduce((prev, cur) => {
-return (haversine(lat, lon, cur.lat, cur.lon) < haversine(lat, lon, prev.lat, prev.lon)) ? cur : prev;
-});
-}
+const stationLookup = {
+"DOOLIN": { tide: "GALWAY_PORT", weather: "SHANNON_AIRPORT" },
+"KILKEE": { tide: "KILRUSH", weather: "SHANNON_AIRPORT" },
+"LAHINCH": { tide: "GALWAY_PORT", weather: "SHANNON_AIRPORT" },
+"SPANISH_POINT": { tide: "KILRUSH", weather: "SHANNON_AIRPORT" },
+"KINVARA": { tide: "GALWAY_PORT", weather: "GALWAY_AIRPORT" },
+"GALWAY": { tide: "GALWAY_PORT", weather: "GALWAY_AIRPORT" },
+"TRALEE": { tide: "FENIT", weather: "VALENTIA_OBSERVATORY" },
+"DINGLE": { tide: "VALENTIA", weather: "VALENTIA_OBSERVATORY" }
+};
 
 async function updateData() {
-const query = document.getElementById("location").value || "Doolin";
-
-// Geocode via OpenStreetMap Nominatim
-const geoUrl = proxy + encodeURIComponent(`https://nominatim.openstreetmap.org/search?format=json&q=${query},Ireland`);
-const geoResp = await fetch(geoUrl);
-const geoData = await geoResp.json();
-if (!geoData.length) {
-document.getElementById("weatherData").textContent = "Location not found.";
-document.getElementById("tideData").textContent = "";
-return;
-}
-const lat = parseFloat(geoData[0].lat);
-const lon = parseFloat(geoData[0].lon);
-
-// Find nearest stations
-const nearestWeather = nearestStation(lat, lon, weatherStations);
-const nearestTide = nearestStation(lat, lon, tideStations);
+const loc = document.getElementById("location").value;
+const station = stationLookup[loc];
 
 // WEATHER
 try {
-const weatherUrl = proxy + encodeURIComponent(`https://prodapi.metweb.ie/observations/${nearestWeather.id}`);
+const weatherUrl = proxy + encodeURIComponent(`https://prodapi.metweb.ie/observations/${station.weather}`);
 const w = await fetch(weatherUrl);
 const weather = await w.json();
 document.getElementById("weatherData").innerHTML = `
-<strong>${nearestWeather.id}</strong><br>
+<strong>${station.weather}</strong><br>
 Temp: ${weather.report.temperature} °C<br>
 Wind: ${weather.report.wind_speed} kt (${weather.report.wind_direction_text})<br>
 Gusts: ${weather.report.wind_gust} kt<br>
@@ -146,10 +123,10 @@ Pressure: ${weather.report.pressure} hPa
 document.getElementById("weatherData").textContent = "Error fetching weather.";
 }
 
-// TIDES (next 12h only)
+// TIDES
 try {
 const tideUrl = proxy + encodeURIComponent(
-`https://erddap.marine.ie/erddap/tabledap/I_NATIONAL_TIDE_GAUGE_NETWORK.json?station_id,sea_surface_height,time&station_id="${nearestTide.id}"&time>=now&time<=now+12hours`
+`https://erddap.marine.ie/erddap/tabledap/I_NATIONAL_TIDE_GAUGE_NETWORK.json?station_id,sea_surface_height,time&station_id="${station.tide}"&time>=now&time<=now+12hours`
 );
 const t = await fetch(tideUrl);
 const tides = await t.json();
@@ -157,12 +134,12 @@ const rows = tides.table.rows.map(r => {
 const [id, height, time] = r;
 return `<li>${new Date(time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} — ${height.toFixed(2)} m</li>`;
 }).join("");
-document.getElementById("tideData").innerHTML = `<strong>${nearestTide.id}</strong><br><ul style="list-style:none; padding:0">${rows}</ul>`;
+document.getElementById("tideData").innerHTML = `<strong>${station.tide}</strong><br><ul style="list-style:none; padding:0">${rows}</ul>`;
 } catch (e) {
 document.getElementById("tideData").textContent = "Error fetching tides.";
 }
 
-// SAR NEWS (simple RSS search)
+// SAR NEWS
 try {
 const newsUrl = proxy + encodeURIComponent("https://news.google.com/rss/search?q=Irish+Coast+Guard+SAR&hl=en-IE&gl=IE&ceid=IE:en");
 const n = await fetch(newsUrl);
