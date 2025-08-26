@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Doolin Coast Guard SAR Call Out Toolkit</title>
+<title>Doolin Irish Coast Guard Unit - Latest data for active call out</title>
 <style>
 body {
 font-family: Arial, sans-serif;
@@ -97,7 +97,7 @@ overflow:auto;
 </style>
 </head>
 <body>
-<h1>Doolin Coast Guard SAR Call Out Toolkit</h1>
+<h1>Doolin Irish Coast Guard Unit - Latest data for active call out</h1>
 
 <div id="locationBox">
 <label for="location">Change location:</label>
@@ -113,8 +113,7 @@ overflow:auto;
 </select>
 </div>
 
-<div id="pageTitle">Doolin IRCG Unit</div>
-<div id="subtitle">Call out data for location</div>
+<div id="subtitle">Data for </div>
 <div id="lastUpdated">Last updated: loading…</div>
 
 <div class="container">
@@ -190,7 +189,7 @@ const end = new Date(start.getTime() + 12 * 3600 * 1000);
 const startISO = start.toISOString();
 const endISO = end.toISOString();
 const tideUrl = proxy + encodeURIComponent(
-`https://erddap.marine.ie/erddap/tabledap/I_NATIONAL_TIDE_GAUGE_NETWORK.json?station_id,sea_surface_height,time&station_id="${station.tide}"&time>=${startISO}&time<=${endISO}`
+`https://erddap.marine.ie/erddap/tabledap/IrishNationalTideGaugeNetwork.json?station_id,sea_surface_height,time&station_id="${station.tide}"&time>=${startISO}&time<=${endISO}`
 );
 debugDiv.innerHTML += `<div>Fetching tides: ${tideUrl}</div>`;
 const t = await fetch(tideUrl);
