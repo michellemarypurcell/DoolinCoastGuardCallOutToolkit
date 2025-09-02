@@ -1,153 +1,14 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Doolin Irish Coast Guard Unit - Latest data for active call out</title>
-<style>
-body {
-font-family: Arial, sans-serif;
-background: url('background.jpg') no-repeat center center fixed;
-background-size: cover;
-color: #fff;
-text-align: center;
-margin: 0;
-padding: 0;
-}
-
-h1 {
-background: rgba(0, 0, 0, 0.6);
-padding: 20px;
-font-size: 2.5em;
-margin: 0;
-}
-
-#locationBox {
-position: absolute;
-top: 10px;
-right: 10px;
-background: rgba(0,0,0,0.5);
-padding: 5px 10px;
-border-radius: 8px;
-font-size: 0.9em;
-}
-
-#locationBox label {
-font-weight: bold;
-margin-right: 5px;
-}
-
-#pageTitle {
-margin-top: 80px;
-font-size: 2em;
-font-weight: bold;
-}
-
-#subtitle {
-font-size: 1.4em;
-margin-bottom: 10px;
-}
-
-#lastUpdated {
-background: #0077cc;
-color: white;
-padding: 5px;
-font-size: 1.2em;
-margin-bottom: 20px;
-}
-
-.container {
-display: flex;
-flex-direction: column;
-justify-content: center;
-align-items: center;
-gap: 40px;
-margin: 20px auto;
-max-width: 1200px;
-}
-
-.widget {
-background: rgba(0, 0, 0, 0.65);
-padding: 40px;
-border-radius: 15px;
-width: 90%;
-max-width: 900px;
-font-size: 1.8em;
-text-align: left;
-}
-
-.widget h2 {
-margin-top: 0;
-font-size: 2.2em;
-text-align: center;
-}
-
-#debug {
-position: fixed;
-bottom: 0;
-left: 0;
-width: 100%;
-background: rgba(0,0,0,0.7);
-color: #0f0;
-font-size: 0.8em;
-text-align: left;
-padding: 5px;
-max-height: 150px;
-overflow:auto;
-}
-</style>
-</head>
-<body>
-<h1>Doolin Irish Coast Guard Unit - Latest data for active call out</h1>
-
-<div id="locationBox">
-<label for="location">Change location:</label>
-<select id="location" onchange="updateData()">
-<option value="DOOLIN" selected>Doolin Port</option>
-<option value="KILKEE">Kilkee</option>
-<option value="LAHINCH">Lahinch</option>
-<option value="SPANISH_POINT">Spanish Point</option>
-<option value="KINVARA">Kinvara</option>
-<option value="GALWAY">Galway</option>
-<option value="TRALEE">Tralee</option>
-<option value="DINGLE">Dingle</option>
-</select>
-</div>
-
-<div id="subtitle">Data for </div>
-<div id="lastUpdated">Last updated: loading…</div>
-
-<div class="container">
-<div class="widget">
-<h2>Weather</h2>
-<div id="weatherData">Loading...</div>
-</div>
-
-<div class="widget">
-<h2>Tides</h2>
-<div id="tideData">Loading...</div>
-</div>
-
-<div class="widget">
-<h2>SAR News</h2>
-<div id="newsData">Loading...</div>
-</div>
-</div>
-
-<div id="debug"></div>
-
 <script>
-const proxy = "https://doolin-sar-proxy.michellemarypurcell.workers.dev/?url=";
-
-// Map locations to Met Éireann + Marine Institute stations
+// Map locations to coordinates + tide stations
 const stationLookup = {
-"DOOLIN": { tide: "GALWAY_PORT", weather: "SHANNON_AIRPORT" },
-"KILKEE": { tide: "KILRUSH", weather: "SHANNON_AIRPORT" },
-"LAHINCH": { tide: "GALWAY_PORT", weather: "SHANNON_AIRPORT" },
-"SPANISH_POINT": { tide: "KILRUSH", weather: "SHANNON_AIRPORT" },
-"KINVARA": { tide: "GALWAY_PORT", weather: "GALWAY_AIRPORT" },
-"GALWAY": { tide: "GALWAY_PORT", weather: "GALWAY_AIRPORT" },
-"TRALEE": { tide: "FENIT", weather: "VALENTIA_OBSERVATORY" },
-"DINGLE": { tide: "VALENTIA", weather: "VALENTIA_OBSERVATORY" }
+"DOOLIN": { lat: 53.016, lon: -9.4, tide: "GALWAY_PORT" },
+"KILKEE": { lat: 52.678, lon: -9.644, tide: "KILRUSH" },
+"LAHINCH": { lat: 52.933, lon: -9.35, tide: "GALWAY_PORT" },
+"SPANISH_POINT": { lat: 52.85, lon: -9.42, tide: "KILRUSH" },
+"KINVARA": { lat: 53.14, lon: -8.93, tide: "GALWAY_PORT" },
+"GALWAY": { lat: 53.27, lon: -9.05, tide: "GALWAY_PORT" },
+"TRALEE": { lat: 52.27, lon: -9.7, tide: "FENIT" },
+"DINGLE": { lat: 52.14, lon: -10.27, tide: "VALENTIA" }
 };
 
 async function updateData() {
@@ -156,44 +17,41 @@ const station = stationLookup[loc];
 const debugDiv = document.getElementById("debug");
 debugDiv.innerHTML = "";
 
-document.getElementById("pageTitle").textContent = `${loc} IRCG Unit`;
-
+document.getElementById("subtitle").textContent = `Data for ${loc}`;
 const now = new Date();
 document.getElementById("lastUpdated").textContent =
 `Last updated: ${now.toLocaleString()}`;
 
-// WEATHER
+// WEATHER (Open-Meteo)
 try {
-const weatherUrl = proxy + encodeURIComponent(
-`https://prodapi.metweb.ie/observations/${station.weather}?format=json`
-);
+const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${station.lat}&longitude=${station.lon}&current_weather=true`;
 debugDiv.innerHTML += `<div>Fetching weather: ${weatherUrl}</div>`;
 const w = await fetch(weatherUrl);
 const weather = await w.json();
+const c = weather.current_weather;
 document.getElementById("weatherData").innerHTML = `
-<strong>${station.weather}</strong><br>
-Temp: ${weather.report.temperature} °C<br>
-Wind: ${weather.report.wind_speed} kt (${weather.report.wind_direction_text})<br>
-Gusts: ${weather.report.wind_gust} kt<br>
-Pressure: ${weather.report.pressure} hPa
+<strong>${loc}</strong><br>
+Temp: ${c.temperature} °C<br>
+Wind: ${c.windspeed} km/h (dir ${c.winddirection}°)<br>
+Time: ${c.time}
 `;
 } catch (e) {
 document.getElementById("weatherData").textContent = "Error fetching weather.";
 debugDiv.innerHTML += `<div style="color:red">Weather error: ${e}</div>`;
 }
 
-// TIDES
+// TIDES (Marine Institute ERDDAP)
 try {
 const start = new Date();
 const end = new Date(start.getTime() + 12 * 3600 * 1000);
 const startISO = start.toISOString();
 const endISO = end.toISOString();
-const tideUrl = proxy + encodeURIComponent(
-`https://erddap.marine.ie/erddap/tabledap/IrishNationalTideGaugeNetwork.json?station_id,sea_surface_height,time&station_id="${station.tide}"&time>=${startISO}&time<=${endISO}`
-);
+const tideUrl =
+`https://erddap.marine.ie/erddap/tabledap/IrishNationalTideGaugeNetwork.json?station_id,sea_surface_height,time&station_id=${station.tide}&time>=${startISO}&time<=${endISO}`;
 debugDiv.innerHTML += `<div>Fetching tides: ${tideUrl}</div>`;
 const t = await fetch(tideUrl);
 const tides = await t.json();
+if (tides.table.rows.length === 0) throw "No tide data available";
 const rows = tides.table.rows.map(r => {
 const [id, height, time] = r;
 return `<li>${new Date(time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} — ${height.toFixed(2)} m</li>`;
@@ -205,12 +63,17 @@ document.getElementById("tideData").textContent = "Error fetching tides.";
 debugDiv.innerHTML += `<div style="color:red">Tide error: ${e}</div>`;
 }
 
-// SAR NEWS
+// SAR NEWS (Google + RNLI fallback)
 try {
-const newsUrl = proxy + encodeURIComponent("https://news.google.com/rss/search?q=Irish+Coast+Guard+SAR&hl=en-IE&gl=IE&ceid=IE:en");
+const newsUrl = `https://news.google.com/rss/search?q=Irish+Coast+Guard+SAR&hl=en-IE&gl=IE&ceid=IE:en`;
 debugDiv.innerHTML += `<div>Fetching news: ${newsUrl}</div>`;
-const n = await fetch(newsUrl);
-const text = await n.text();
+let n = await fetch(newsUrl);
+let text = await n.text();
+if (text.includes("<rss") === false) {
+// fallback to RNLI
+n = await fetch("https://rnli.org/news-and-media/rss-feeds/latest-news");
+text = await n.text();
+}
 const parser = new DOMParser();
 const xml = parser.parseFromString(text, "text/xml");
 const items = xml.querySelectorAll("item");
@@ -228,8 +91,7 @@ debugDiv.innerHTML += `<div style="color:red">News error: ${e}</div>`;
 }
 }
 
+// refresh every 60s
 setInterval(updateData, 60000);
 window.onload = updateData;
 </script>
-</body>
-</html>
