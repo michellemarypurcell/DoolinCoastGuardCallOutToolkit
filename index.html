@@ -254,33 +254,56 @@ debugDiv.innerHTML += `<div style="color:red">Weather error: ${e}</div>`;
 
 // TIDES (Marine Institute ERDDAP) with colour coding + trend arrows
 try {
-const start = new Date();
-const end = new Date(start.getTime() + 12 * 3600 * 1000);
-const startISO = isoNoMs(start);
-const endISO = isoNoMs(end);
+  const start = new Date();
+  const end = new Date(start.getTime() + 12 * 3600 * 1000);
+  const startISO = isoNoMs(start);
+  const endISO = isoNoMs(end);
 
-// Use a proxy service: AllOrigins
-const originalTideUrl = `https://erddap.marine.ie/erddap/tabledap/IrishNationalTideGaugeNetwork.json?station_id,sea_surface_height,time&station_id=${station.tide}&time>=${startISO}&time<=${endISO}`;
-const tideUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(originalTideUrl)}`;
+  // Use your new private serverless proxy
+  const proxyBaseUrl = "https://YOUR_VERCEL_PROJECT_NAME.vercel.app/api/tide-proxy"; 
+  const originalTideUrl = `https://erddap.marine.ie/erddap/tabledap/IrishNationalTideGaugeNetwork.json?station_id,sea_surface_height,time&station_id=${station.tide}&time>=${startISO}&time<=${endISO}`;
+  const tideUrl = `${proxyBaseUrl}?url=${encodeURIComponent(originalTideUrl)}`;
 
-debugDiv.innerHTML += `<div>Fetching tides: ${tideUrl}</div>`;
-const t = await fetch(tideUrl);
+  debugDiv.innerHTML += `<div>Fetching tides: ${tideUrl}</div>`;
+  const t = await fetch(tideUrl);
 
-if (!t.ok) {
-throw new Error(`HTTP error! status: ${t.status}`);
+  if (!t.ok) {
+    const errorData = await t.json();
+    throw new Error(`HTTP error! status: ${t.status}, details: ${JSON.stringify(errorData)}`);
+  }
+
+  const tides = await t.json();
+  if (tides.table.rows.length === 0) throw "No tide data available";
+
+  const rows = tides.table.rows.map((r, i, arr) => {
+    const [id, height, time] = r;
+    let color = "white";
+    if (height < 0.5) color = "red";
+    else if (height < 1.5) color = "orange";
+    else if (height <= 3.0) color = "limegreen";
+    else color = "deepskyblue";
+
+    // Trend arrow
+    let arrow = "";
+    if (i < arr.length - 1) {
+      const nextHeight = arr[i + 1][1];
+      if (nextHeight > height) arrow = "⬆";
+      else if (nextHeight < height) arrow = "⬇";
+    }
+
+    return `<li style="color:${color}">
+      ${new Date(time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} —
+      ${height.toFixed(2)} m ${arrow}
+    </li>`;
+  }).join("");
+  document.getElementById("tideData").innerHTML =
+    `<strong>${station.tide}</strong><br><ul style="list-style:none; padding:0">${rows}</ul>`;
+
+} catch (e) {
+  document.getElementById("tideData").textContent = "Error fetching tides.";
+  debugDiv.innerHTML += `<div style="color:red">Tide error: ${e}</div>`;
 }
-
-const tides = await t.json();
-if (tides.table.rows.length === 0) throw "No tide data available";
-
-const rows = tides.table.rows.map((r, i, arr) => {
-const [id, height, time] = r;
-let color = "white";
-if (height < 0.5) color = "red";
-else if (height < 1.5) color = "orange";
-else if (height <= 3.0) color = "limegreen";
-else color = "deepskyblue";
-
+  
 // Trend arrow
 let arrow = "";
 if (i < arr.length - 1) {
