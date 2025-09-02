@@ -157,10 +157,10 @@ overflow:auto;
 <div id="tideData">Loading...</div>
 <!-- Tide Legend -->
 <div class="legend">
-<div><span style="background:red"></span> Low (<0.5 m)</div>
+<div><span style="background:red"></span> Low (&lt;0.5 m)</div>
 <div><span style="background:orange"></span> Caution (0.5–1.5 m)</div>
 <div><span style="background:limegreen"></span> Good (1.5–3.0 m)</div>
-<div><span style="background:deepskyblue"></span> Very High (>3.0 m)</div>
+<div><span style="background:deepskyblue"></span> Very High (&gt;3.0 m)</div>
 </div>
 </div>
 
@@ -191,6 +191,11 @@ const stationLookup = {
 "INIS_MEAIN": { lat: 53.08, lon: -9.57, tide: "GALWAY_PORT" },
 "INIS_OIRR": { lat: 53.06, lon: -9.51, tide: "GALWAY_PORT" }
 };
+
+// Helper: strip ms + force Z
+function isoNoMs(date) {
+return date.toISOString().split('.')[0] + "Z";
+}
 
 async function updateData() {
 const loc = document.getElementById("location").value;
@@ -236,19 +241,20 @@ document.getElementById("weatherData").textContent = "Error fetching weather.";
 debugDiv.innerHTML += `<div style="color:red">Weather error: ${e}</div>`;
 }
 
-// TIDES (Marine Institute ERDDAP) with colour coding
+// TIDES (Marine Institute ERDDAP) with colour coding + trend arrows
 try {
 const start = new Date();
 const end = new Date(start.getTime() + 12 * 3600 * 1000);
-const startISO = start.toISOString();
-const endISO = end.toISOString();
+const startISO = isoNoMs(start);
+const endISO = isoNoMs(end);
 const tideUrl =
 `https://erddap.marine.ie/erddap/tabledap/IrishNationalTideGaugeNetwork.json?station_id,sea_surface_height,time&station_id=${station.tide}&time>=${startISO}&time<=${endISO}`;
 debugDiv.innerHTML += `<div>Fetching tides: ${tideUrl}</div>`;
 const t = await fetch(tideUrl);
 const tides = await t.json();
 if (tides.table.rows.length === 0) throw "No tide data available";
-const rows = tides.table.rows.map(r => {
+
+const rows = tides.table.rows.map((r, i, arr) => {
 const [id, height, time] = r;
 let color = "white";
 if (height < 0.5) color = "red";
@@ -256,8 +262,17 @@ else if (height < 1.5) color = "orange";
 else if (height <= 3.0) color = "limegreen";
 else color = "deepskyblue";
 
+// Trend arrow
+let arrow = "";
+if (i < arr.length - 1) {
+const nextHeight = arr[i + 1][1];
+if (nextHeight > height) arrow = "⬆";
+else if (nextHeight < height) arrow = "⬇";
+}
+
 return `<li style="color:${color}">
-${new Date(time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} — ${height.toFixed(2)} m
+${new Date(time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} —
+${height.toFixed(2)} m ${arrow}
 </li>`;
 }).join("");
 document.getElementById("tideData").innerHTML =
@@ -267,25 +282,25 @@ document.getElementById("tideData").textContent = "Error fetching tides.";
 debugDiv.innerHTML += `<div style="color:red">Tide error: ${e}</div>`;
 }
 
-// SAR NEWS
+// SAR NEWS (via rss2json proxy)
 try {
-const newsUrl = `https://news.google.com/rss/search?q=Irish+Coast+Guard+SAR&hl=en-IE&gl=IE&ceid=IE:en`;
+const rssUrl = "https://news.google.com/rss/search?q=Irish+Coast+Guard+SAR&hl=en-IE&gl=IE&ceid=IE:en";
+const newsUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
 debugDiv.innerHTML += `<div>Fetching news: ${newsUrl}</div>`;
 let n = await fetch(newsUrl);
-let text = await n.text();
-if (!text.includes("<rss")) {
-// fallback to RNLI feed
-n = await fetch("https://rnli.org/news-and-media/rss-feeds/latest-news");
-text = await n.text();
+let newsJson = await n.json();
+
+if (!newsJson.items || newsJson.items.length === 0) {
+// fallback RNLI
+const rnliUrl = "https://api.rss2json.com/v1/api.json?rss_url=" + encodeURIComponent("https://rnli.org/news-and-media/rss-feeds/latest-news");
+debugDiv.innerHTML += `<div>Fetching RNLI news: ${rnliUrl}</div>`;
+n = await fetch(rnliUrl);
+newsJson = await n.json();
 }
-const parser = new DOMParser();
-const xml = parser.parseFromString(text, "text/xml");
-const items = xml.querySelectorAll("item");
+
 let html = "<ul style='list-style:none; padding:0'>";
-items.forEach((item, idx) => {
-if (idx < 5) {
-html += `<li><a href="${item.querySelector("link").textContent}" target="_blank" style="color:#fff">${item.querySelector("title").textContent}</a></li>`;
-}
+newsJson.items.slice(0,5).forEach(item => {
+html += `<li><a href="${item.link}" target="_blank" style="color:#fff">${item.title}</a></li>`;
 });
 html += "</ul>";
 document.getElementById("newsData").innerHTML = html;
