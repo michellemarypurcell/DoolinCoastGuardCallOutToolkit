@@ -37,12 +37,6 @@ font-weight: bold;
 margin-right: 5px;
 }
 
-#pageTitle {
-margin-top: 80px;
-font-size: 2em;
-font-weight: bold;
-}
-
 #subtitle {
 font-size: 1.4em;
 margin-bottom: 10px;
@@ -94,6 +88,18 @@ font-size: 2.2em;
 text-align: center;
 }
 
+/* Legend styling */
+.legend {
+font-size: 0.9em;
+margin-top: 10px;
+}
+.legend span {
+display: inline-block;
+width: 18px;
+height: 18px;
+margin-right: 6px;
+border-radius: 4px;
+}
 #debug {
 position: fixed;
 bottom: 0;
@@ -123,12 +129,19 @@ overflow:auto;
 <option value="GALWAY">Galway</option>
 <option value="TRALEE">Tralee</option>
 <option value="DINGLE">Dingle</option>
+<option value="FANORE">Fanore</option>
+<option value="QUILTY">Quilty</option>
+<option value="WHITESTRAND">Whitestrand</option>
+<option value="KILRUSH">Kilrush</option>
+<option value="INIS_MOR">Inis Mór</option>
+<option value="INIS_MEAIN">Inis Meáin</option>
+<option value="INIS_OIRR">Inis Oírr</option>
 </select>
 </div>
 
 <div id="subtitle">Data for </div>
 
-<!-- NEW sticky info box -->
+<!-- Sticky info box -->
 <div id="locationInfo">Loading location info…</div>
 
 <div id="lastUpdated">Last updated: loading…</div>
@@ -142,6 +155,13 @@ overflow:auto;
 <div class="widget">
 <h2>Tides</h2>
 <div id="tideData">Loading...</div>
+<!-- Tide Legend -->
+<div class="legend">
+<div><span style="background:red"></span> Low (<0.5 m)</div>
+<div><span style="background:orange"></span> Caution (0.5–1.5 m)</div>
+<div><span style="background:limegreen"></span> Good (1.5–3.0 m)</div>
+<div><span style="background:deepskyblue"></span> Very High (>3.0 m)</div>
+</div>
 </div>
 
 <div class="widget">
@@ -162,7 +182,14 @@ const stationLookup = {
 "KINVARA": { lat: 53.14, lon: -8.93, tide: "GALWAY_PORT" },
 "GALWAY": { lat: 53.27, lon: -9.05, tide: "GALWAY_PORT" },
 "TRALEE": { lat: 52.27, lon: -9.7, tide: "FENIT" },
-"DINGLE": { lat: 52.14, lon: -10.27, tide: "VALENTIA" }
+"DINGLE": { lat: 52.14, lon: -10.27, tide: "VALENTIA" },
+"FANORE": { lat: 53.14, lon: -9.28, tide: "GALWAY_PORT" },
+"QUILTY": { lat: 52.82, lon: -9.45, tide: "KILRUSH" },
+"WHITESTRAND": { lat: 52.85, lon: -9.42, tide: "KILRUSH" },
+"KILRUSH": { lat: 52.64, lon: -9.48, tide: "KILRUSH" },
+"INIS_MOR": { lat: 53.11, lon: -9.65, tide: "GALWAY_PORT" },
+"INIS_MEAIN": { lat: 53.08, lon: -9.57, tide: "GALWAY_PORT" },
+"INIS_OIRR": { lat: 53.06, lon: -9.51, tide: "GALWAY_PORT" }
 };
 
 async function updateData() {
@@ -176,12 +203,19 @@ const now = new Date();
 document.getElementById("lastUpdated").textContent =
 `Last updated: ${now.toLocaleString()}`;
 
-// Location info
-const localTime = now.toLocaleString("en-IE", { timeZone: "Europe/Dublin" });
+// Location info (sticky header)
+const localTime = now.toLocaleString("en-IE", {
+timeZone: "Europe/Dublin",
+weekday: "short",
+day: "numeric",
+month: "short",
+hour: "2-digit",
+minute: "2-digit"
+});
 document.getElementById("locationInfo").innerHTML = `
 <strong>${loc}</strong><br>
 Lat: ${station.lat.toFixed(3)}, Lon: ${station.lon.toFixed(3)}<br>
-Local time: ${localTime}
+${localTime}
 `;
 
 // WEATHER (Open-Meteo)
@@ -202,7 +236,7 @@ document.getElementById("weatherData").textContent = "Error fetching weather.";
 debugDiv.innerHTML += `<div style="color:red">Weather error: ${e}</div>`;
 }
 
-// TIDES (Marine Institute ERDDAP)
+// TIDES (Marine Institute ERDDAP) with colour coding
 try {
 const start = new Date();
 const end = new Date(start.getTime() + 12 * 3600 * 1000);
@@ -216,7 +250,15 @@ const tides = await t.json();
 if (tides.table.rows.length === 0) throw "No tide data available";
 const rows = tides.table.rows.map(r => {
 const [id, height, time] = r;
-return `<li>${new Date(time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} — ${height.toFixed(2)} m</li>`;
+let color = "white";
+if (height < 0.5) color = "red";
+else if (height < 1.5) color = "orange";
+else if (height <= 3.0) color = "limegreen";
+else color = "deepskyblue";
+
+return `<li style="color:${color}">
+${new Date(time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} — ${height.toFixed(2)} m
+</li>`;
 }).join("");
 document.getElementById("tideData").innerHTML =
 `<strong>${station.tide}</strong><br><ul style="list-style:none; padding:0">${rows}</ul>`;
