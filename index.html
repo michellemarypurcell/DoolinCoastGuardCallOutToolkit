@@ -197,6 +197,28 @@ function isoNoMs(date) {
 return date.toISOString().split('.')[0] + "Z";
 }
 
+// Live clock in Irish time
+function updateClock() {
+const now = new Date();
+const irishTime = now.toLocaleString("en-IE", {
+timeZone: "Europe/Dublin",
+hour: "2-digit",
+minute: "2-digit",
+second: "2-digit"
+});
+const locationInfo = document.getElementById("locationInfo");
+const loc = document.getElementById("location").value;
+const station = stationLookup[loc];
+locationInfo.innerHTML = `
+<strong>${loc}</strong><br>
+Lat: ${station.lat.toFixed(3)}, Lon: ${station.lon.toFixed(3)}<br>
+Time: ${irishTime}
+`;
+}
+
+// Update clock every second
+setInterval(updateClock, 1000);
+
 async function updateData() {
 const loc = document.getElementById("location").value;
 const station = stationLookup[loc];
@@ -208,32 +230,23 @@ const now = new Date();
 document.getElementById("lastUpdated").textContent =
 `Last updated: ${now.toLocaleString()}`;
 
-// Location info (sticky header)
-const localTime = now.toLocaleString("en-IE", {
-timeZone: "Europe/Dublin",
-weekday: "short",
-day: "numeric",
-month: "short",
-hour: "2-digit",
-minute: "2-digit"
-});
-document.getElementById("locationInfo").innerHTML = `
-<strong>${loc}</strong><br>
-Lat: ${station.lat.toFixed(3)}, Lon: ${station.lon.toFixed(3)}<br>
-${localTime}
-`;
+// Update clock immediately
+updateClock();
 
 // WEATHER (Open-Meteo)
 try {
-const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${station.lat}&longitude=${station.lon}&current_weather=true`;
+const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${station.lat}&longitude=${station.lon}&current_weather=true&hourly=winddirection_10m,windgusts_10m`;
 debugDiv.innerHTML += `<div>Fetching weather: ${weatherUrl}</div>`;
 const w = await fetch(weatherUrl);
 const weather = await w.json();
 const c = weather.current_weather;
+const h = weather.hourly;
 document.getElementById("weatherData").innerHTML = `
 <strong>${loc}</strong><br>
 Temp: ${c.temperature} °C<br>
 Wind: ${c.windspeed} km/h (dir ${c.winddirection}°)<br>
+Gusts: ${h.windgusts_10m[0]} km/h<br>
+Direction: ${h.winddirection_10m[0]}°<br>
 Time: ${c.time}
 `;
 } catch (e) {
@@ -310,9 +323,12 @@ debugDiv.innerHTML += `<div style="color:red">News error: ${e}</div>`;
 }
 }
 
-// refresh every 60s
+// Refresh data every 60s
 setInterval(updateData, 60000);
-window.onload = updateData;
+window.onload = () => {
+updateData();
+updateClock();
+};
 </script>
 </body>
 </html>
