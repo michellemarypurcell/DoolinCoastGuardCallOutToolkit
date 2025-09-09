@@ -17,10 +17,10 @@
   header{padding:12px;background:rgba(0,0,0,0.65)}
   h1{margin:0;font-size:2.2rem;text-align:center}
   #warningBanner{display:none;padding:14px;margin-top:10px;border-radius:8px;color:#111;font-weight:800;text-align:center}
-  #infoBar{position:sticky;top:0;z-index:1000;background:var(--bg-overlay);display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:3px solid var(--accent)}
-  #infoBar .left{font-size:1.3rem}
-  #infoBar .right{display:flex;align-items:center;gap:16px;font-size:1.2rem}
-  #locationSelect{padding:10px;border-radius:8px;background:rgba(255,255,255,0.07);color:var(--white);border:1px solid rgba(255,255,255,0.2)}
+  #infoBar{position:sticky;top:0;z-index:1000;background:var(--bg-overlay);display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:3px solid var(--accent);flex-wrap:wrap}
+  #infoBar .left{font-size:1.2rem}
+  #infoBar .right{display:flex;align-items:center;gap:12px;font-size:1rem;flex-wrap:wrap}
+  #locationSelect{padding:8px;border-radius:8px;background:rgba(255,255,255,0.07);color:var(--white);border:1px solid rgba(255,255,255,0.2)}
   main{flex:1;display:flex;gap:24px;padding:18px}
   .panel{flex:1;background:rgba(0,0,0,0.7);padding:20px;border-radius:14px;display:flex;flex-direction:column}
   h2{text-align:center;font-size:1.6rem;margin:0 0 12px}
@@ -41,17 +41,29 @@
   .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:1rem}
   .legend .box{display:inline-block;width:18px;height:18px;border-radius:4px;margin-right:6px}
   /* SAR ticker */
-  #tickerWrap{position:fixed;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);padding:16px 20px;border-top:4px solid rgba(255,255,255,0.1);z-index:2000}
+  #tickerWrap{position:fixed;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);padding:16px 20px;border-top:4px solid rgba(255,255,255,0.1);z-index:2000;transition:background .3s ease}
   #ticker{height:74px;display:flex;align-items:center;overflow:hidden}
   .tick{min-width:100%;opacity:0;transform:translateX(28px);transition:all .6s ease;padding:6px}
   .tick.show{opacity:1;transform:translateX(0)}
   .tick .title{font-weight:900;font-size:1.35rem}
   .tick .meta{font-size:1.15rem;opacity:0.9}
   .badge{font-weight:900;padding:2px 6px;border-radius:4px;margin-right:8px}
-  .badge.met{background:var(--warn-yellow);color:#000}
+  .badge.met{background:var(--warn-yellow);color:#000;animation:flash 1s infinite}
   .badge.rnli{background:var(--rnli-orange);color:#000}
   .badge.dot{background:var(--dot-green);color:#000}
+  @keyframes flash {0%,50%,100%{opacity:1}25%,75%{opacity:0.2}}
   footer{padding:12px;text-align:center;font-size:1.1rem;background:rgba(0,0,0,0.35)}
+
+  /* Mobile view */
+  @media(max-width: 768px){
+    main{flex-direction:column}
+    .panel{margin-bottom:16px}
+    .tick .title{font-size:1.1rem}
+    .tick .meta{font-size:0.9rem}
+    #ticker{height:auto}
+    #infoBar .left{font-size:1rem}
+    #infoBar .right{font-size:0.9rem}
+  }
 </style>
 </head>
 <body>
@@ -69,7 +81,7 @@
 <main>
   <section class="panel">
     <h2>Weather</h2>
-    <div style="display:flex;justify-content:space-between;align-items:center">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
       <div style="display:flex;gap:16px;align-items:center">
         <svg id="weatherIconSvg"></svg>
         <div>
@@ -79,7 +91,7 @@
       </div>
       <div style="text-align:right">
         <div id="weatherTime"></div>
-        <div style="display:flex;gap:14px;margin-top:10px;align-items:center">
+        <div style="display:flex;gap:14px;margin-top:10px;align-items:center;flex-wrap:wrap">
           <div id="compass">
             <div class="compass-label n">N</div><div class="compass-label s">S</div>
             <div class="compass-label e">E</div><div class="compass-label w">W</div>
@@ -109,9 +121,8 @@
 <footer><span id="latestData">Latest data as of: --</span></footer>
 
 <script>
-/* Location mapping */
-const LOCS = {
- "DOOLIN":{name:"Doolin Port",lat:53.016,lon:-9.4,station:"Inishmore"},
+/* Locations */
+const LOCS={ "DOOLIN":{name:"Doolin Port",lat:53.016,lon:-9.4,station:"Inishmore"},
  "FANORE":{name:"Fanore",lat:53.14,lon:-9.28,station:"Inishmore"},
  "LAHINCH":{name:"Lahinch",lat:52.933,lon:-9.35,station:"Galway_Port"},
  "KINVARA":{name:"Kinvara",lat:53.14,lon:-8.93,station:"Galway_Port"},
@@ -125,36 +136,35 @@ const LOCS = {
  "DINGLE":{name:"Dingle",lat:52.14,lon:-10.27,station:"Dingle_Harbour"},
  "INIS_MOR":{name:"Inis Mór",lat:53.11,lon:-9.65,station:"Inishmore"},
  "INIS_MEAIN":{name:"Inis Meáin",lat:53.08,lon:-9.57,station:"Inishmaan"},
- "INIS_OIRR":{name:"Inis Oírr",lat:53.06,lon:-9.51,station:"Inisheer"}
-};
+ "INIS_OIRR":{name:"Inis Oírr",lat:53.06,lon:-9.51,station:"Inisheer"}};
 const DEFAULT="DOOLIN";
 
-/* Ticker sources */
-const MET_WARN_RSS = "https://www.met.ie/warningsxml/rss.xml";
-const RNLI_RSS = "https://rnli.org/news-and-media/rss-feeds/latest-news";
-const DOT_WORKER = "https://YOUR_WORKER_URL.workers.dev/?limit=10"; // set your Worker URL
+/* Feeds */
+const MET_WARN_RSS="https://www.met.ie/warningsxml/rss.xml";
+const RNLI_RSS="https://rnli.org/news-and-media/rss-feeds/latest-news";
+const DOT_WORKER="https://YOUR_WORKER_URL.workers.dev/?limit=10"; // Replace
 
-/* init dropdown */
+/* Init dropdown */
 const sel=document.getElementById("locationSelect");
 for(const [id,loc] of Object.entries(LOCS)){const o=document.createElement("option");o.value=id;o.textContent=loc.name;if(id===DEFAULT)o.selected=true;sel.appendChild(o);}
 let CUR=LOCS[DEFAULT];
 sel.onchange=()=>{CUR=LOCS[sel.value];document.getElementById("locName").textContent=CUR.name;document.getElementById("latlon").textContent=`Lat: ${CUR.lat}, Lon: ${CUR.lon}`;updateAll();};
 
 /* Clock */
-function tick(){const t=new Date().toLocaleTimeString('en-IE',{hour12:false});document.getElementById("clock").innerHTML=`<strong>Current time:</strong> ${t}`;}
+function tick(){document.getElementById("clock").innerHTML=`<strong>Current time:</strong> ${new Date().toLocaleTimeString('en-IE',{hour12:false})}`;}
 setInterval(tick,1000);tick();
 
-/* Weather (simplified) */
-async function fetchWeather(){const url=`https://api.open-meteo.com/v1/forecast?latitude=${CUR.lat}&longitude=${CUR.lon}&current_weather=true&hourly=temperature_2m,weathercode&timezone=Europe/Dublin`;return (await fetch(url)).json();}
+/* Weather */
+async function fetchWeather(){return(await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${CUR.lat}&longitude=${CUR.lon}&current_weather=true&hourly=temperature_2m,weathercode&timezone=Europe/Dublin`)).json();}
 function compassDir(d){const dirs=["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];return dirs[Math.round(d/22.5)%16];}
 function renderWeather(j){if(!j.current_weather)return;const w=j.current_weather;document.getElementById("weatherNow").textContent=`${w.temperature}°C`;document.getElementById("weatherTime").textContent=w.time;const d=w.winddirection;document.getElementById("windText").textContent=`${w.windspeed} km/h • ${Math.round(d)}° ${compassDir(d)}`;document.getElementById("compassArrow").style.transform=`translate(-50%,-50%) rotate(${d}deg)`;}
 
 /* Tides */
-async function fetchTides(){const now=new Date();const s=now.toISOString().split('.')[0]+"Z";const e=new Date(now.getTime()+6*3600e3).toISOString().split('.')[0]+"Z";const url=`https://erddap.marine.ie/erddap/tabledap/TidePrediction.json?station_id,sea_surface_height,time&station_id=${CUR.station}&time>=${s}&time<=${e}`;return (await fetch(url)).json();}
+async function fetchTides(){const now=new Date();const s=now.toISOString().split('.')[0]+"Z";const e=new Date(now.getTime()+6*3600e3).toISOString().split('.')[0]+"Z";return(await fetch(`https://erddap.marine.ie/erddap/tabledap/TidePrediction.json?station_id,sea_surface_height,time&station_id=${CUR.station}&time>=${s}&time<=${e}`)).json();}
 function renderTides(j){const ul=document.getElementById("tideList");ul.innerHTML="";if(!j.table?.rows?.length){document.getElementById("tideSummary").textContent="No tide data";return;}j.table.rows.forEach(r=>{const t=new Date(r[2]).toLocaleTimeString('en-IE',{hour:'2-digit',minute:'2-digit'});const h=+r[1];const li=document.createElement("li");li.style.color=h<0.5?"red":h<1.5?"orange":h<3?"limegreen":"deepskyblue";li.textContent=`${t} — ${h.toFixed(2)} m`;ul.appendChild(li);});document.getElementById("tideSummary").textContent=`${j.table.rows.length} forecast points`;}
 
 /* Feeds */
-async function fetchWarnings(){try{const r=await fetch(MET_WARN_RSS);const xml=new DOMParser().parseFromString(await r.text(),"text/xml");const items=[...xml.querySelectorAll("item")];return items.map(x=>({title:x.querySelector("title")?.textContent||"",source:"Met Éireann",time:new Date().toLocaleTimeString('en-IE',{hour12:false})}));}catch{return[]}}
+async function fetchWarnings(){try{const r=await fetch(MET_WARN_RSS);const xml=new DOMParser().parseFromString(await r.text(),"text/xml");return[...xml.querySelectorAll("item")].map(x=>({title:x.querySelector("title")?.textContent||"",source:"Met Éireann",time:new Date().toLocaleTimeString('en-IE',{hour12:false})}));}catch{return[]}}
 async function fetchRNLI(){try{const r=await fetch("https://api.rss2json.com/v1/api.json?rss_url="+encodeURIComponent(RNLI_RSS));const j=await r.json();return j.items.map(x=>({title:x.title,source:"RNLI",time:new Date(x.pubDate).toLocaleTimeString('en-IE',{hour12:false})}));}catch{return[]}}
 async function fetchDoT(){if(!DOT_WORKER)return[];try{const r=await fetch(DOT_WORKER);const arr=await r.json();return arr.map(x=>({title:x.title,source:"DoT Marine Notices",time:new Date(x.pubDate).toLocaleTimeString('en-IE',{hour12:false})}));}catch{return[]}}
 
@@ -164,19 +174,25 @@ function renderTicker(items){
   if(!items.length){box.textContent="No current official headlines";return;}
   items.forEach(m=>{
     const d=document.createElement("div");d.className="tick";
-    let badgeClass="";let badgeText="";
+    let badgeClass="",badgeText="";
     if(m.source.includes("Met")){badgeClass="met";badgeText="[Met]";}
     else if(m.source.includes("RNLI")){badgeClass="rnli";badgeText="[RNLI]";}
     else if(m.source.includes("DoT")){badgeClass="dot";badgeText="[DoT]";}
-    d.innerHTML=`
-      <span class="badge ${badgeClass}">${badgeText}</span>
-      <span class="title">${m.title}</span>
-      <div class="meta">${m.source} • ${m.time}</div>
-    `;
+    d.innerHTML=`<span class="badge ${badgeClass}">${badgeText}</span><span class="title">${m.title}</span><div class="meta">${m.source} • ${m.time}</div>`;
     box.appendChild(d);
   });
   let i=0;const t=box.querySelectorAll(".tick");t[0].classList.add("show");
-  setInterval(()=>{t[i].classList.remove("show");i=(i+1)%t.length;t[i].classList.add("show");},10000);
+  setInterval(()=>{
+    t[i].classList.remove("show");
+    i=(i+1)%t.length;
+    t[i].classList.add("show");
+    // flash background if Met
+    if(t[i].innerHTML.includes("[Met]")){
+      const wrap=document.getElementById("tickerWrap");
+      wrap.style.background="yellow";
+      setTimeout(()=>{wrap.style.background="rgba(0,0,0,0.9)";},1000);
+    }
+  },10000);
 }
 
 /* Update all */
@@ -184,7 +200,7 @@ async function updateAll(){
   document.getElementById("dataFrom").textContent="Data from: "+new Date().toLocaleTimeString('en-IE',{hour12:false});
   const [w,t,warn,rnli,dot]=await Promise.all([fetchWeather(),fetchTides(),fetchWarnings(),fetchRNLI(),fetchDoT()]);
   renderWeather(w);renderTides(t);
-  const news=[...warn,...rnli,...dot].filter(x=>x.title);renderTicker(news);
+  renderTicker([...warn,...rnli,...dot].filter(x=>x.title));
   document.getElementById("latestData").textContent="Latest data as of: "+new Date().toLocaleTimeString('en-IE',{hour12:false});
 }
 updateAll();setInterval(updateAll,60000);
