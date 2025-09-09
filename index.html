@@ -9,9 +9,9 @@
     --bg-overlay: rgba(0,0,0,0.76);
     --accent: #2aa3ff;
     --white: #fff;
-    --warn-red: #ff4d4d;
-    --warn-orange: #ffb84d;
     --warn-yellow: #ffd54d;
+    --rnli-orange: #ff9800;
+    --dot-green: #66bb6a;
   }
   body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#0b0b0b url('background.jpg') center/cover no-repeat fixed;color:var(--white);display:flex;flex-direction:column}
   header{padding:12px;background:rgba(0,0,0,0.65)}
@@ -107,7 +107,7 @@
 <footer><span id="latestData">Latest data as of: --</span></footer>
 
 <script>
-/* Location mapping with correct tide gauges */
+/* Location mapping */
 const LOCS = {
  "DOOLIN":{name:"Doolin Port",lat:53.016,lon:-9.4,station:"Inishmore"},
  "FANORE":{name:"Fanore",lat:53.14,lon:-9.28,station:"Inishmore"},
@@ -130,7 +130,7 @@ const DEFAULT="DOOLIN";
 /* Ticker sources */
 const MET_WARN_RSS = "https://www.met.ie/warningsxml/rss.xml";
 const RNLI_RSS = "https://rnli.org/news-and-media/rss-feeds/latest-news";
-const DOT_WORKER = "https://YOUR_WORKER_URL.workers.dev/?limit=10"; // <- set your Worker URL
+const DOT_WORKER = "https://YOUR_WORKER_URL.workers.dev/?limit=10"; // set your Worker URL
 
 /* init dropdown */
 const sel=document.getElementById("locationSelect");
@@ -142,7 +142,7 @@ sel.onchange=()=>{CUR=LOCS[sel.value];document.getElementById("locName").textCon
 function tick(){const t=new Date().toLocaleTimeString('en-IE',{hour12:false});document.getElementById("clock").innerHTML=`<strong>Current time:</strong> ${t}`;}
 setInterval(tick,1000);tick();
 
-/* Weather fetch/render (simplified, as before) */
+/* Weather */
 async function fetchWeather(){const url=`https://api.open-meteo.com/v1/forecast?latitude=${CUR.lat}&longitude=${CUR.lon}&current_weather=true&hourly=temperature_2m,weathercode&timezone=Europe/Dublin`;return (await fetch(url)).json();}
 function compassDir(d){const dirs=["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];return dirs[Math.round(d/22.5)%16];}
 function renderWeather(j){if(!j.current_weather)return;const w=j.current_weather;document.getElementById("weatherNow").textContent=`${w.temperature}°C`;document.getElementById("weatherTime").textContent=w.time;const d=w.winddirection;document.getElementById("windText").textContent=`${w.windspeed} km/h • ${Math.round(d)}° ${compassDir(d)}`;document.getElementById("compassArrow").style.transform=`translate(-50%,-50%) rotate(${d}deg)`;}
@@ -151,18 +151,32 @@ function renderWeather(j){if(!j.current_weather)return;const w=j.current_weather
 async function fetchTides(){const now=new Date();const s=now.toISOString().split('.')[0]+"Z";const e=new Date(now.getTime()+6*3600e3).toISOString().split('.')[0]+"Z";const url=`https://erddap.marine.ie/erddap/tabledap/TidePrediction.json?station_id,sea_surface_height,time&station_id=${CUR.station}&time>=${s}&time<=${e}`;return (await fetch(url)).json();}
 function renderTides(j){const ul=document.getElementById("tideList");ul.innerHTML="";if(!j.table?.rows?.length){document.getElementById("tideSummary").textContent="No tide data";return;}j.table.rows.forEach(r=>{const t=new Date(r[2]).toLocaleTimeString('en-IE',{hour:'2-digit',minute:'2-digit'});const h=+r[1];const li=document.createElement("li");li.style.color=h<0.5?"red":h<1.5?"orange":h<3?"limegreen":"deepskyblue";li.textContent=`${t} — ${h.toFixed(2)} m`;ul.appendChild(li);});document.getElementById("tideSummary").textContent=`${j.table.rows.length} forecast points`;}
 
-/* Fetch official feeds */
-async function fetchWarnings(){const r=await fetch(MET_WARN_RSS);const xml=new DOMParser().parseFromString(await r.text(),"text/xml");const items=[...xml.querySelectorAll("item,title")].map(x=>x.textContent);return items.map(t=>({title:t,source:"Met Éireann",time:new Date().toISOString()}));}
-async function fetchRNLI(){const r=await fetch("https://api.rss2json.com/v1/api.json?rss_url="+encodeURIComponent(RNLI_RSS));const j=await r.json();return j.items.map(x=>({title:x.title,source:"RNLI",time:x.pubDate}));}
-async function fetchDoT(){if(!DOT_WORKER)return[];const r=await fetch(DOT_WORKER);return (await r.json()).map(x=>({title:x.title,source:"DoT Marine Notices",time:x.pubDate}));}
+/* Feeds */
+async function fetchWarnings(){try{const r=await fetch(MET_WARN_RSS);const xml=new DOMParser().parseFromString(await r.text(),"text/xml");const items=[...xml.querySelectorAll("item")];return items.map(x=>({title:x.querySelector("title")?.textContent||"",source:"Met Éireann",time:new Date().toISOString()}));}catch{return[]}}
+async function fetchRNLI(){try{const r=await fetch("https://api.rss2json.com/v1/api.json?rss_url="+encodeURIComponent(RNLI_RSS));const j=await r.json();return j.items.map(x=>({title:x.title,source:"RNLI",time:x.pubDate}));}catch{return[]}}
+async function fetchDoT(){if(!DOT_WORKER)return[];try{const r=await fetch(DOT_WORKER);const arr=await r.json();return arr.map(x=>({title:x.title,source:"DoT Marine Notices",time:x.pubDate}));}catch{return[]}}
 
 /* Ticker */
-function renderTicker(items){const box=document.getElementById("ticker");box.innerHTML="";if(!items.length){box.textContent="No current official headlines";return;}items.forEach(m=>{const d=document.createElement("div");d.className="tick";d.innerHTML=`<div class="title">${m.title}</div><div class="meta">${m.source} • ${m.time}</div>`;box.appendChild(d);});let i=0;const t=box.querySelectorAll(".tick");t[0].classList.add("show");setInterval(()=>{t[i].classList.remove("show");i=(i+1)%t.length;t[i].classList.add("show");},8000);}
+function renderTicker(items){
+  const box=document.getElementById("ticker");box.innerHTML="";
+  if(!items.length){box.textContent="No current official headlines";return;}
+  items.forEach(m=>{
+    const d=document.createElement("div");d.className="tick";
+    let color="white";
+    if(m.source.includes("Met")) color="var(--warn-yellow)";
+    else if(m.source.includes("RNLI")) color="var(--rnli-orange)";
+    else if(m.source.includes("DoT")) color="var(--dot-green)";
+    d.innerHTML=`<div class="title" style="color:${color}">${m.title}</div><div class="meta" style="color:${color}">${m.source} • ${m.time}</div>`;
+    box.appendChild(d);
+  });
+  let i=0;const t=box.querySelectorAll(".tick");t[0].classList.add("show");
+  setInterval(()=>{t[i].classList.remove("show");i=(i+1)%t.length;t[i].classList.add("show");},10000);
+}
 
 /* Update all */
 async function updateAll(){
   document.getElementById("dataFrom").textContent="Data from: "+new Date().toLocaleTimeString('en-IE',{hour12:false});
-  const [w,t,warn,rnli,dot] = await Promise.all([fetchWeather(),fetchTides(),fetchWarnings(),fetchRNLI(),fetchDoT()]);
+  const [w,t,warn,rnli,dot]=await Promise.all([fetchWeather(),fetchTides(),fetchWarnings(),fetchRNLI(),fetchDoT()]);
   renderWeather(w);renderTides(t);
   const news=[...warn,...rnli,...dot].filter(x=>x.title);renderTicker(news);
   document.getElementById("latestData").textContent="Latest data as of: "+new Date().toLocaleTimeString('en-IE',{hour12:false});
