@@ -1,126 +1,608 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Irish Coast Tide and Weather Dashboard - SAR Display</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #000;
-            color: #fff;
-            font-size: 1.5em; /* Large font for TV screen */
-            overflow: hidden; /* No scrolling on TV */
-        }
-        .sar-banner {
-            background-color: #ff0000; /* Red for warnings */
-            color: #fff;
-            padding: 10px;
-            text-align: center;
-            font-weight: bold;
-            font-size: 1.8em;
-            width: 100%;
-            position: fixed;
-            top: 0;
-            z-index: 10;
-            border-bottom: 5px solid #fff;
-        }
-        .main-content {
-            margin-top: 120px; /* Space for banner */
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            height: calc(100vh - 140px - 150px); /* Adjust for banner and latest data */
-        }
-        .weather-widget, .tide-widget {
-            width: 100%;
-            margin-bottom: 20px;
-            padding: 20px;
-            background-color: #333;
-            border: 2px solid #fff;
-            white-space: nowrap; /* No wrapping */
-            overflow-x: auto; /* Horizontal scroll if needed, but aim for full width */
-            font-size: 1.6em;
-        }
-        .clear-section {
-            text-align: center;
-            padding: 10px;
-            background-color: #444;
-            border: 2px solid #fff;
-        }
-        .clear-btn {
-            font-size: 2em;
-            padding: 10px 20px;
-            background-color: #fff;
-            color: #000;
-            border: none;
-            cursor: pointer;
-        }
-        .latest-data {
-            position: fixed;
-            bottom: 0;
-            width: 100%;
-            background-color: #000;
-            color: #fff;
-            padding: 10px;
-            font-size: 1.4em;
-            border-top: 5px solid #fff;
-            z-index: 10;
-            white-space: nowrap;
-            overflow-x: auto;
-        }
-        /* Ensure widgets use full page width */
-        @media screen and (min-width: 1920px) { /* For large TV screens */
-            .weather-widget, .tide-widget {
-                font-size: 2em;
-            }
-        }
-    </style>
-    <script>
-        function clearDisplay() {
-            // Placeholder for clear function - e.g., reset form or hide alerts
-            alert('Display cleared!'); // For demo; replace with actual logic
-            document.querySelector('.latest-data').innerHTML = 'Latest Data Cleared - Monitoring Active';
-        }
-    </script>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Doolin IRCG — Live Ops Dashboard</title>
+<style>
+  :root{
+    --bg-overlay: rgba(0,0,0,0.7);
+    --accent: #0077cc;
+    --font: "Segoe UI", Roboto, Arial, sans-serif;
+    --white: #fff;
+  }
+  html,body{height:100%;margin:0;background:#111;color:var(--white);font-family:var(--font)}
+  body{
+    background: url('background.jpg') center/cover no-repeat fixed;
+    display:flex;flex-direction:column;
+  }
+  header{padding:8px 14px;background:linear-gradient(180deg, rgba(0,0,0,0.6), rgba(0,0,0,0.3));}
+  h1{margin:6px 0;font-size:1.8rem;text-align:center}
+  #warningBanner{
+    display:none;
+    padding:8px 12px;
+    margin-top:6px;
+    border-radius:6px;
+    color:#111;
+    font-weight:700;
+    text-align:center;
+  }
+  /* sticky info */
+  #info {
+    position:sticky; top:0; z-index:50;
+    background:var(--bg-overlay);
+    display:flex;align-items:center;justify-content:space-between;
+    gap:10px;padding:10px 16px;border-bottom:3px solid var(--accent);
+    color:var(--white);
+  }
+  #info .left{font-size:1.2rem}
+  #info .right{font-size:1.2rem}
+  main{flex:1;display:flex;align-items:stretch;justify-content:center;padding:18px;gap:20px}
+  /* two columns */
+  .col{background:rgba(0,0,0,0.6);border-radius:12px;padding:18px;min-width:360px;max-width:760px;flex:1;box-sizing:border-box}
+  h2{margin:6px 0 12px 0;font-size:1.5rem;text-align:center}
+  .small {font-size:0.95rem}
+  #weatherIcon{font-size:3.4rem}
+  .row {display:flex;gap:12px;align-items:center}
+  .forecastHours{display:flex;gap:10px;flex-wrap:nowrap;overflow:hidden}
+  .fh {min-width:80px;background:rgba(255,255,255,0.04);padding:8px;border-radius:8px;text-align:center}
+  /* Tide list */
+  #tideList {list-style:none;padding:0;margin:6px 0;max-height:320px;overflow:auto}
+  #tideList li{padding:6px 0;border-bottom:1px dashed rgba(255,255,255,0.03)}
+  /* legend */
+  .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:0.9rem}
+  .legend span.box{display:inline-block;width:16px;height:16px;border-radius:3px;margin-right:6px;vertical-align:middle}
+  /* bottom ticker */
+  #tickerWrap{position:fixed;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);padding:12px 18px;border-top:3px solid rgba(255,255,255,0.03);z-index:60}
+  #ticker{height:48px;display:flex;align-items:center;overflow:hidden}
+  .tick{min-width:100%;opacity:0;transform:translateX(30px);transition:opacity .6s ease, transform .6s cubic-bezier(.2,.7,.2,1)}
+  .tick.show{opacity:1;transform:translateX(0)}
+  .tick .title{font-weight:700;margin-bottom:4px}
+  .tick .meta{font-size:0.9rem;opacity:0.85}
+  /* footer */
+  footer{padding:10px 18px;background:linear-gradient(180deg,rgba(0,0,0,0.35),rgba(0,0,0,0.1));text-align:center;font-size:0.95rem}
+  /* small debug (collapsible) */
+  #debug{position:fixed;left:8px;bottom:72px;background:rgba(0,0,0,0.7);color:#0f0;padding:8px;border-radius:6px;font-size:0.8rem;max-width:46%;max-height:180px;overflow:auto;opacity:0.12;transition:opacity .2s}
+  #debug:hover{opacity:1}
+  a{color:inherit;text-decoration:underline}
+  /* responsive */
+  @media (max-width:900px){main{flex-direction:column;padding:8px} .col{max-width:none}}
+</style>
 </head>
 <body>
-    <!-- Single SAR Banner - No Duplicates -->
-    <div class="sar-banner">
-        🚨 SAR MARINE WARNINGS ALERT 🚨<br>
-        Issued by Met Éireann - Valid for Irish Coastal Waters (as of September 9, 2025)<br><br>
-        - Yellow Small Craft Warning (Winds): South to southeasterly winds reaching Force 6 or higher. Affects all coasts of Ireland. Valid from 00:00 to 12:00 today (Sep 9).<br>
-        - Yellow Small Craft Warning (Winds): South to southeasterly winds reaching Force 6 or higher at times. Affects Rossan Point to Strangford Lough to Hook Head (eastern/southern coasts). Valid from 12:00 today to 04:00 tomorrow (Sep 10).<br><br>
-        No active tide or sea state warnings reported. Stay safe—small craft operators advised to seek shelter. For updates, check Met Éireann Warnings.
+<header>
+  <h1>Doolin Irish Coast Guard Unit — Live Ops Dashboard</h1>
+  <div id="warningBanner" role="status" aria-live="polite"></div>
+</header>
+
+<div id="info">
+  <div class="left">
+    <strong>Doolin Port</strong> — Lat: 53.016, Lon: -9.400
+  </div>
+  <div class="right">
+    <span id="clock">--:--:--</span>
+  </div>
+</div>
+
+<main>
+  <section class="col" id="weatherCol" aria-labelledby="weatherTitle">
+    <h2 id="weatherTitle">Weather</h2>
+    <div class="row" style="align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div id="weatherIcon">⏳</div>
+        <div>
+          <div id="weatherNow" style="font-size:1.1rem"></div>
+          <div id="weatherWind" class="small"></div>
+        </div>
+      </div>
+      <div style="text-align:right" id="weatherTime" class="small"></div>
     </div>
 
-    <div class="main-content">
-        <!-- Weather Widget - Expanded to use more page, no wrap -->
-        <div class="weather-widget">
-            Weather Overview for Irish Coast - September 9, 2025:<br>
-            South to southeasterly winds Force 6 or higher. Cloudy with possible rain. Temperatures 12-15°C. Sea state moderate to rough in exposed areas. Visibility good.
-        </div>
-
-        <!-- Tide Widget - Fixed Fetching with Embedded Latest Predictions; Expanded, No Wrap -->
-        <div class="tide-widget">
-            Latest Tide Data (Predictions/Real-Time from Marine Institute & Tide-Forecast - Fixed ERDDAP Access via Alternatives):<br>
-            Dublin: High Tide 10:03 AM 3.43m | Low Tide 3:49 PM 1.53m | Next High ~10:00 PM 3.20m<br>
-            Galway: High Tide 3:48 AM 3.88m | Low Tide 9:46 AM 1.90m | High Tide 3:59 PM 4.10m<br>
-            Cork: Low Tide ~12:40 PM (from recent cycle) 0.80m | High Tide ~6:45 PM 3.50m | Data sourced from harmonic predictions due to ERDDAP query resolution.<br>
-            Note: For real-time, use direct Marine Institute FTP or irishtides.ie. ERDDAP fixed by using CSV subset queries or alternatives like tide-forecast.com.
-        </div>
-
-        <!-- Clear Section -->
-        <div class="clear-section">
-            <button class="clear-btn" onclick="clearDisplay()">Clear</button>
-        </div>
+    <div style="margin-top:12px">
+      <div style="font-weight:700;margin-bottom:6px">Next 3 hours</div>
+      <div id="hourly" class="forecastHours"></div>
     </div>
+  </section>
 
-    <!-- Persistent Latest Data Below Clear - Fixed Position, No Scroll Needed, Single Instance - No Duplicates -->
-    <div class="latest-data">
-        Latest Data Summary (Persistent on TV Screen): Dublin Water Level ~2.5m (as of 09:00) | Galway ~3.0m | Cork ~1.8m | All Stations Stable | Last Update: 09:00 Sep 9, 2025 | Monitoring Active - No Anomalies.
+  <section class="col" id="tideCol" aria-labelledby="tideTitle">
+    <h2 id="tideTitle">Tides (Observed & Forecast)</h2>
+    <div id="tideSummary" style="font-weight:700;margin-bottom:8px">Loading...</div>
+    <ul id="tideList" aria-live="polite"></ul>
+
+    <div class="legend">
+      <div><span class="box" style="background:red"></span>Low (&lt;0.5 m)</div>
+      <div><span class="box" style="background:orange"></span>Caution (0.5–1.5 m)</div>
+      <div><span class="box" style="background:limegreen"></span>Good (1.5–3.0 m)</div>
+      <div><span class="box" style="background:deepskyblue"></span>Very High (&gt;3.0 m)</div>
     </div>
+  </section>
+</main>
+
+<div id="tickerWrap" aria-live="polite">
+  <div id="ticker"></div>
+</div>
+
+<footer>
+  <span id="latestData">Latest data as of: --</span>
+</footer>
+
+<div id="debug" title="debug (hover to read)">debug info</div>
+
+<script>
+/* ================== CONFIG & STATION (fixed for TV) ================== */
+const LOCATION = { id: "DOOLIN", name: "Doolin Port", lat: 53.016, lon: -9.4, tide: "GALWAY_PORT" };
+
+/* Feeds */
+const RNLI_RSS = "https://rnli.org/news-and-media/rss-feeds/latest-news";
+const GOOGLE_SEARCH_RSS = "https://news.google.com/rss/search?q=Irish+Coast+Guard+SAR&hl=en-IE&gl=IE&ceid=IE:en";
+const RSS2JSON = "https://api.rss2json.com/v1/api.json?rss_url="; // free proxy
+
+/* ERDDAP endpoints */
+const ERDDAP_BASE = "https://erddap.marine.ie/erddap/tabledap";
+const OBSERVED_DS = "IrishNationalTideGaugeNetwork.json";      // observed
+const FORECAST_DS = "TidePrediction.json";                    // forecast predictions
+
+/* Met Éireann warnings XML */
+const MET_WARNINGS_XML = "https://www.met.ie/Open_Data/xml/warnings.xml";
+
+/* Refresh intervals */
+const REFRESH_SECONDS = 60;
+const TICKER_ROTATE_SECONDS = 10;
+
+/* Helpers */
+function logDebug(msg) {
+  const d = document.getElementById("debug");
+  const now = new Date().toLocaleTimeString();
+  d.innerHTML = now + " — " + msg + "<br>" + d.innerHTML;
+}
+
+/* Clock */
+function updateClock() {
+  const now = new Date();
+  const str = now.toLocaleString("en-IE", { timeZone: "Europe/Dublin", hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  document.getElementById("clock").textContent = str;
+  document.getElementById("latestData").textContent = `Latest data as of: ${str}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+/* Weather icon mapping (Open-Meteo weathercode -> emoji + label) */
+const weatherMap = {
+  0: {icon:"☀️", label:"Clear"},
+  1: {icon:"🌤️", label:"Mainly clear"},
+  2: {icon:"⛅", label:"Partly cloudy"},
+  3: {icon:"☁️", label:"Overcast"},
+  45: {icon:"🌫️", label:"Fog"},
+  48: {icon:"🌫️", label:"Depositing rime fog"},
+  51: {icon:"🌦️", label:"Light drizzle"},
+  53: {icon:"🌦️", label:"Moderate drizzle"},
+  55: {icon:"🌧️", label:"Dense drizzle"},
+  56: {icon:"🌧️", label:"Freezing drizzle"},
+  57: {icon:"🌧️", label:"Dense freezing drizzle"},
+  61: {icon:"🌧️", label:"Slight rain"},
+  63: {icon:"🌧️", label:"Moderate rain"},
+  65: {icon:"🌧️", label:"Heavy rain"},
+  66: {icon:"🌨️", label:"Freezing rain"},
+  67: {icon:"🌨️", label:"Heavy freezing rain"},
+  71: {icon:"🌨️", label:"Slight snow"},
+  73: {icon:"🌨️", label:"Moderate snow"},
+  75: {icon:"🌨️", label:"Heavy snow"},
+  80: {icon:"🌧️", label:"Rain showers"},
+  81: {icon:"🌧️", label:"Moderate showers"},
+  82: {icon:"🌧️", label:"Violent showers"},
+  85: {icon:"🌨️", label:"Slight snow showers"},
+  86: {icon:"🌨️", label:"Heavy snow showers"},
+  95: {icon:"⛈️", label:"Thunderstorm"},
+  96: {icon:"⛈️", label:"Thunderstorm with hail"},
+  99: {icon:"⛈️", label:"Severe thunderstorm"}
+};
+
+/* utility to format relative/absolute times */
+function formatTimeISO(iso) {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString("en-IE", { timeZone: "Europe/Dublin", hour12:false, hour:"2-digit", minute:"2-digit" });
+  } catch(e) { return iso; }
+}
+function hoursAgo(iso) {
+  const d = new Date(iso);
+  const diff = (Date.now() - d.getTime()) / (1000*3600);
+  return diff;
+}
+function niceRelative(iso) {
+  const diffhr = hoursAgo(iso);
+  if (diffhr < 1) {
+    const m = Math.round((Date.now()-new Date(iso))/60000);
+    return `${m}m ago`;
+  }
+  return `${Math.round(diffhr)}h ago`;
+}
+
+/* ======== FETCH & RENDER PIPELINE ======== */
+
+async function fetchMetWarnings() {
+  // returns an array of warning objects { level, headline, text, pubDate } for Yellow/Orange/Red
+  try {
+    const r = await fetch(MET_WARNINGS_XML);
+    if (!r.ok) throw new Error("Met warnings fetch failed: " + r.status);
+    const txt = await r.text();
+    // parse XML
+    const parser = new DOMParser();
+    const xml = parser.parseFromString(txt, "text/xml");
+    // Many possible structures; search for nodes containing colour/level info
+    const warnings = [];
+    // Attempt structured parse: <warning> nodes
+    const warningNodes = xml.querySelectorAll("warning,alert,issue");
+    warningNodes.forEach(node => {
+      const text = node.textContent || "";
+      // find colour keywords
+      const upper = text.toUpperCase();
+      const found = ["RED","ORANGE","YELLOW"].find(c => upper.includes(c));
+      if (found) {
+        warnings.push({
+          level: found,
+          headline: (node.querySelector("headline")?.textContent || node.querySelector("title")?.textContent || (text.split('\n')[0]||"Met Éireann warning")).trim(),
+          text: (node.querySelector("description")?.textContent || text).trim(),
+          pubDate: node.querySelector("pubDate")?.textContent || new Date().toISOString()
+        });
+      }
+    });
+    // As fallback, do keyword search across entire xml text for "Red"/"Orange"/"Yellow"
+    if (warnings.length === 0) {
+      const up = txt.toUpperCase();
+      if (up.includes("RED") || up.includes("ORANGE") || up.includes("YELLOW")) {
+        // crude: create a single banner entry
+        let level = up.includes("RED") ? "RED" : up.includes("ORANGE") ? "ORANGE" : "YELLOW";
+        warnings.push({
+          level,
+          headline: "Met Éireann Weather Warning: " + level,
+          text: "See Met Éireann warnings for details.",
+          pubDate: new Date().toISOString()
+        });
+      }
+    }
+    return warnings;
+  } catch (e) {
+    logDebug("Met warnings error: " + (e.message || e));
+    return [];
+  }
+}
+
+async function fetchWeather() {
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${LOCATION.lat}&longitude=${LOCATION.lon}&current_weather=true&hourly=temperature_2m,weathercode,windspeed_10m&timezone=Europe%2FDublin&forecast_hours=6`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("Weather fetch failed: " + r.status);
+    const j = await r.json();
+    return j;
+  } catch (e) {
+    logDebug("Weather error: "+e.message);
+    return null;
+  }
+}
+
+function renderWeather(data) {
+  if (!data || !data.current_weather) {
+    document.getElementById("weatherNow").textContent = "Weather unavailable";
+    document.getElementById("weatherIcon").textContent = "❓";
+    document.getElementById("hourly").innerHTML = "";
+    return;
+  }
+  const now = data.current_weather;
+  const code = now.weathercode;
+  const map = weatherMap[code] || {icon:"❔", label:"Unknown"};
+  document.getElementById("weatherIcon").textContent = map.icon;
+  document.getElementById("weatherNow").innerHTML = `${map.label} — <strong>${now.temperature}°C</strong>`;
+  document.getElementById("weatherWind").textContent = `Wind: ${now.windspeed} km/h, dir ${now.winddirection}°`;
+  document.getElementById("weatherTime").textContent = formatTimeISO(now.time);
+
+  // build next 3-hour outlook from hourly arrays if present
+  const hourlyContainer = document.getElementById("hourly");
+  hourlyContainer.innerHTML = "";
+  if (data.hourly && data.hourly.time && data.hourly.time.length) {
+    // find current index
+    const times = data.hourly.time;
+    const temps = data.hourly.temperature_2m || [];
+    const codes = data.hourly.weathercode || [];
+    // pick next 3 entries from now (matching times on the hour)
+    const nowTs = new Date(now.time).getTime();
+    for (let i=0;i<times.length;i++){
+      const t = new Date(times[i]).getTime();
+      if (t >= nowTs && hourlyContainer.children.length < 3) {
+        const ic = document.createElement("div");
+        ic.className = "fh";
+        const codei = codes[i] ?? null;
+        const mapi = weatherMap[codei] || {icon:"❔", label:""};
+        ic.innerHTML = `<div style="font-size:1.1rem">${formatTimeISO(times[i])}</div>
+                        <div style="font-size:1.6rem">${mapi.icon}</div>
+                        <div style="font-weight:600">${temps[i] ?? ""}°C</div>`;
+        hourlyContainer.appendChild(ic);
+      }
+    }
+  }
+}
+
+/* ===== TIDES: observed (past 12h) + forecast (next 12h) ===== */
+
+function isoNoMs(date) { return date.toISOString().split('.')[0] + "Z"; }
+
+async function fetchObservedTides(station, startISO, endISO) {
+  const url = `${ERDDAP_BASE}/${OBSERVED_DS}?station_id,sea_surface_height,time&station_id=${encodeURIComponent(station)}&time>=${startISO}&time<=${endISO}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("Observed tide fetch failed: " + r.status);
+  const j = await r.json();
+  // j.table.rows -> [ [station_id, height, time], ... ]
+  return j.table?.rows?.map(r => ({ source:"observed", station:r[0], h: Number(r[1]), time: r[2] })) || [];
+}
+
+async function fetchForecastTides(station, startISO, endISO) {
+  const url = `${ERDDAP_BASE}/${FORECAST_DS}?station_id,sea_surface_height,time&station_id=${encodeURIComponent(station)}&time>=${startISO}&time<=${endISO}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error("Forecast tide fetch failed: " + r.status);
+  const j = await r.json();
+  return j.table?.rows?.map(r => ({ source:"forecast", station:r[0], h: Number(r[1]), time: r[2] })) || [];
+}
+
+/* merge & sort tide entries by time */
+function mergeTides(obs, fct) {
+  const all = [...obs, ...fct];
+  all.sort((a,b)=> new Date(a.time) - new Date(b.time));
+  return all;
+}
+
+/* colour by height */
+function tideColor(h) {
+  if (h < 0.5) return "red";
+  if (h < 1.5) return "orange";
+  if (h <= 3.0) return "limegreen";
+  return "deepskyblue";
+}
+
+/* find next high and low from forecast list (local extrema) */
+function nextHighLow(forecastList) {
+  const now = Date.now();
+  let nextHigh = null, nextLow = null;
+  for (let i=1;i<forecastList.length-1;i++){
+    const curr = forecastList[i];
+    const prev = forecastList[i-1];
+    const next = forecastList[i+1];
+    const tcurr = new Date(curr.time).getTime();
+    if (tcurr < now) continue;
+    if (!nextHigh && curr.h > prev.h && curr.h > next.h) nextHigh = curr;
+    if (!nextLow && curr.h < prev.h && curr.h < next.h) nextLow = curr;
+    if (nextHigh && nextLow) break;
+  }
+  return { nextHigh, nextLow };
+}
+
+/* render tide list + summary */
+function renderTides(mergedList, forecastOnly) {
+  // mergedList: chronological entries (observed & forecast)
+  const tideListEl = document.getElementById("tideList");
+  tideListEl.innerHTML = "";
+  // build list items
+  for (let i=0;i<mergedList.length;i++){
+    const it = mergedList[i];
+    const color = tideColor(it.h);
+    // trend arrow: compare to next
+    let arrow = "";
+    if (i < mergedList.length - 1) {
+      const next = mergedList[i+1];
+      if (next.h > it.h) arrow = "⬆";
+      else if (next.h < it.h) arrow = "⬇";
+    }
+    const li = document.createElement("li");
+    li.style.color = color;
+    li.innerHTML = `<strong>${formatTimeISO(it.time)}</strong> — ${it.h.toFixed(2)} m ${arrow} <span style="opacity:.7">(${it.source})</span>`;
+    tideListEl.appendChild(li);
+  }
+
+  // summary: next high & low from forecast entries
+  const forecastOnlyArr = mergedList.filter(x => x.source === "forecast");
+  const { nextHigh, nextLow } = nextHighLow(forecastOnlyArr);
+  const summaryEl = document.getElementById("tideSummary");
+  let parts = [];
+  if (nextHigh) parts.push(`Next High: ${formatTimeISO(nextHigh.time)} (${nextHigh.h.toFixed(2)} m)`);
+  if (nextLow) parts.push(`Next Low: ${formatTimeISO(nextLow.time)} (${nextLow.h.toFixed(2)} m)`);
+  if (parts.length === 0) summaryEl.textContent = "Next high/low not available";
+  else summaryEl.textContent = parts.join(" — ");
+}
+
+/* ====== NEWS & TICKER ====== */
+
+/* helper to fetch rss via rss2json and label source */
+async function fetchRssViaProxy(rssUrl, sourceLabel) {
+  try {
+    const url = RSS2JSON + encodeURIComponent(rssUrl);
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("RSS proxy failed: " + r.status);
+    const j = await r.json();
+    // j.items -> items with title, link, pubDate, content
+    const feedTitle = (j.feed && j.feed.title) ? j.feed.title : sourceLabel;
+    const items = (j.items || []).map(it => ({
+      title: it.title,
+      link: it.link,
+      pubDate: it.pubDate || it.isoDate || new Date().toISOString(),
+      summary: (it.description || it.content || "").replace(/(<([^>]+)>)/gi, "").trim().slice(0,200),
+      source: sourceLabel || feedTitle
+    }));
+    return items;
+  } catch (e) {
+    logDebug("RSS fetch error (" + sourceLabel + "): " + e.message);
+    return [];
+  }
+}
+
+/* Build prioritized list of ticker items (≤48 hours old) */
+async function buildTickerItems(metWarnings, weatherItems, rnliItems, googleItems) {
+  const now = Date.now();
+  const cutoff = now - 48 * 3600 * 1000;
+  // start with met warnings (if any) - convert to ticker items
+  const ticker = [];
+  metWarnings.forEach(w => {
+    // only consider Yellow/Orange/Red
+    const lvl = (w.level || "").toUpperCase();
+    if (["YELLOW","ORANGE","RED"].includes(lvl)) {
+      ticker.push({
+        title: w.headline,
+        link: "#",
+        pubDate: w.pubDate || new Date().toISOString(),
+        summary: w.text || "",
+        source: "Met Éireann",
+        priority: 0
+      });
+    }
+  });
+  // weather items (from feeds) - include those that appear weather related
+  (weatherItems || []).forEach(it => {
+    const pd = new Date(it.pubDate).getTime();
+    if (pd >= cutoff) ticker.push({...it, priority:1});
+  });
+  // RNLI
+  (rnliItems || []).forEach(it => {
+    const pd = new Date(it.pubDate).getTime();
+    if (pd >= cutoff) ticker.push({...it, priority:2});
+  });
+  // Google News (Irish Coast Guard)
+  (googleItems || []).forEach(it => {
+    const pd = new Date(it.pubDate).getTime();
+    if (pd >= cutoff) ticker.push({...it, priority:3});
+  });
+
+  // sort by priority then recency
+  ticker.sort((a,b) => {
+    if ((a.priority||9) !== (b.priority||9)) return (a.priority||9) - (b.priority||9);
+    return new Date(b.pubDate) - new Date(a.pubDate);
+  });
+  return ticker;
+}
+
+/* render ticker: rotate items with fade + slide */
+let tickerIndex = 0;
+let tickerItemsGlobal = [];
+function startTickerRotation() {
+  const tickerEl = document.getElementById("ticker");
+  if (!tickerItemsGlobal.length) {
+    tickerEl.innerHTML = `<div class="tick show"><div class="title">No recent headlines</div><div class="meta">—</div></div>`;
+    return;
+  }
+  // ensure first render
+  tickerIndex = 0;
+  tickerEl.innerHTML = "";
+  tickerItemsGlobal.forEach((it,i)=>{
+    const div = document.createElement("div");
+    div.className = "tick";
+    div.innerHTML = `<div><div class="title">${it.title}</div><div class="meta">${it.source} • ${formatPubDate(it.pubDate)} — ${it.summary}</div></div>`;
+    tickerEl.appendChild(div);
+  });
+  // show first
+  const ticks = tickerEl.querySelectorAll(".tick");
+  if (!ticks.length) return;
+  ticks.forEach(t=>t.classList.remove("show"));
+  ticks[tickerIndex].classList.add("show");
+
+  // rotate
+  clearInterval(window._tickerTimer);
+  window._tickerTimer = setInterval(()=>{
+    ticks[tickerIndex].classList.remove("show");
+    tickerIndex = (tickerIndex + 1) % ticks.length;
+    ticks[tickerIndex].classList.add("show");
+  }, TICKER_ROTATE_SECONDS*1000);
+}
+
+function formatPubDate(pub) {
+  try {
+    const d = new Date(pub);
+    // show absolute 24h + relative
+    const abs = d.toLocaleString("en-IE", { timeZone:"Europe/Dublin", hour12:false, day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" });
+    const rel = niceRelative(pub);
+    return `${abs} • ${rel}`;
+  } catch(e){return pub;}
+}
+
+/* ===== MAIN update loop ===== */
+async function updateAll() {
+  logDebug("Beginning update cycle");
+  // 1) fetch met warnings
+  const metWarnings = await fetchMetWarnings();
+  // banner
+  if (metWarnings && metWarnings.length) {
+    // pick highest severity (RED>ORANGE>YELLOW)
+    const lvlOrder = { "RED":3, "ORANGE":2, "YELLOW":1 };
+    metWarnings.sort((a,b)=> (lvlOrder[b.level]||0)-(lvlOrder[a.level]||0));
+    const top = metWarnings[0];
+    const banner = document.getElementById("warningBanner");
+    banner.style.display = "block";
+    const color = (top.level==="RED")? "#ff4d4d" : (top.level==="ORANGE")? "#ffb84d" : "#ffd54d";
+    banner.style.background = color;
+    banner.textContent = `${top.level} Warning — ${top.headline}`;
+  } else {
+    document.getElementById("warningBanner").style.display = "none";
+  }
+
+  // 2) weather
+  const weatherData = await fetchWeather();
+  renderWeather(weatherData);
+
+  // 3) tides: observed (past 12h) + forecast (next 12h)
+  try {
+    const now = new Date();
+    const obsStart = isoNoMs(new Date(now.getTime() - 12*3600*1000));
+    const obsEnd = isoNoMs(now);
+    const fctStart = isoNoMs(now);
+    const fctEnd = isoNoMs(new Date(now.getTime() + 12*3600*1000));
+
+    let observed = [];
+    let forecast = [];
+    try { observed = await fetchObservedTides(LOCATION.tide, obsStart, obsEnd); }
+    catch(e){ logDebug("Observed tides fetch failed: " + e.message); observed = []; }
+    try { forecast = await fetchForecastTides(LOCATION.tide, fctStart, fctEnd); }
+    catch(e){ logDebug("Forecast tides fetch failed: " + e.message); forecast = []; }
+
+    const merged = mergeTides(observed, forecast);
+    renderTides(merged);
+  } catch(e) {
+    logDebug("Tide processing error: " + e.message);
+    document.getElementById("tideSummary").textContent = "Tide data not available";
+    document.getElementById("tideList").innerHTML = "";
+  }
+
+  // 4) news & ticker items (priority: met warnings -> weather news -> RNLI -> Google)
+  try {
+    // convert met warnings to ticker items as weather/warning priority
+    const metTickerItems = metWarnings.map(w => ({
+      title: w.headline,
+      link: "#",
+      pubDate: w.pubDate || new Date().toISOString(),
+      summary: w.text || "",
+      source: "Met Éireann",
+      priority: 0
+    }));
+    // weather news: attempt to find met.ie news or weather-specific RSS (we'll fetch Google News for weather keyword)
+    const weatherNews = await fetchRssViaProxy("https://news.google.com/rss/search?q=weather+ireland&hl=en-IE&gl=IE&ceid=IE:en", "Weather News");
+    // RNLI
+    const rnli = await fetchRssViaProxy(RNLI_RSS, "RNLI");
+    // Google search for Irish Coast Guard SAR
+    const g = await fetchRssViaProxy(GOOGLE_SEARCH_RSS, "Google News");
+    // combine and build ticker list (filter <=48h)
+    const tickerItems = await buildTickerItems(metTickerItems, weatherNews, rnli, g);
+    tickerItemsGlobal = tickerItems;
+    startTickerRotation();
+  } catch (e) {
+    logDebug("Ticker build error: " + e.message);
+  }
+
+  logDebug("Update cycle completed");
+}
+
+/* initial + periodic refresh */
+updateAll();
+setInterval(updateAll, REFRESH_SECONDS*1000);
+
+/* Make debug initially unobtrusive */
+document.getElementById("debug").style.opacity = "0.06";
+document.getElementById("debug").innerHTML = "debug messages (hover to show)";
+
+</script>
 </body>
 </html>
