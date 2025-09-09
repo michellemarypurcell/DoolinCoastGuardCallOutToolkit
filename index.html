@@ -47,6 +47,10 @@
   .tick.show{opacity:1;transform:translateX(0)}
   .tick .title{font-weight:900;font-size:1.35rem}
   .tick .meta{font-size:1.15rem;opacity:0.9}
+  .badge{font-weight:900;padding:2px 6px;border-radius:4px;margin-right:8px}
+  .badge.met{background:var(--warn-yellow);color:#000}
+  .badge.rnli{background:var(--rnli-orange);color:#000}
+  .badge.dot{background:var(--dot-green);color:#000}
   footer{padding:12px;text-align:center;font-size:1.1rem;background:rgba(0,0,0,0.35)}
 </style>
 </head>
@@ -63,7 +67,6 @@
 </div>
 
 <main>
-  <!-- Weather -->
   <section class="panel">
     <h2>Weather</h2>
     <div style="display:flex;justify-content:space-between;align-items:center">
@@ -89,7 +92,6 @@
     <div style="margin-top:14px"><div style="font-weight:900;margin-bottom:6px">Last hour + next 5 hours</div><div id="hourly" class="forecastHours"></div></div>
   </section>
 
-  <!-- Tides -->
   <section class="panel">
     <h2>Tides</h2>
     <div id="tideSummary" style="font-weight:900;margin-bottom:10px">Loading…</div>
@@ -142,7 +144,7 @@ sel.onchange=()=>{CUR=LOCS[sel.value];document.getElementById("locName").textCon
 function tick(){const t=new Date().toLocaleTimeString('en-IE',{hour12:false});document.getElementById("clock").innerHTML=`<strong>Current time:</strong> ${t}`;}
 setInterval(tick,1000);tick();
 
-/* Weather */
+/* Weather (simplified) */
 async function fetchWeather(){const url=`https://api.open-meteo.com/v1/forecast?latitude=${CUR.lat}&longitude=${CUR.lon}&current_weather=true&hourly=temperature_2m,weathercode&timezone=Europe/Dublin`;return (await fetch(url)).json();}
 function compassDir(d){const dirs=["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];return dirs[Math.round(d/22.5)%16];}
 function renderWeather(j){if(!j.current_weather)return;const w=j.current_weather;document.getElementById("weatherNow").textContent=`${w.temperature}°C`;document.getElementById("weatherTime").textContent=w.time;const d=w.winddirection;document.getElementById("windText").textContent=`${w.windspeed} km/h • ${Math.round(d)}° ${compassDir(d)}`;document.getElementById("compassArrow").style.transform=`translate(-50%,-50%) rotate(${d}deg)`;}
@@ -152,9 +154,9 @@ async function fetchTides(){const now=new Date();const s=now.toISOString().split
 function renderTides(j){const ul=document.getElementById("tideList");ul.innerHTML="";if(!j.table?.rows?.length){document.getElementById("tideSummary").textContent="No tide data";return;}j.table.rows.forEach(r=>{const t=new Date(r[2]).toLocaleTimeString('en-IE',{hour:'2-digit',minute:'2-digit'});const h=+r[1];const li=document.createElement("li");li.style.color=h<0.5?"red":h<1.5?"orange":h<3?"limegreen":"deepskyblue";li.textContent=`${t} — ${h.toFixed(2)} m`;ul.appendChild(li);});document.getElementById("tideSummary").textContent=`${j.table.rows.length} forecast points`;}
 
 /* Feeds */
-async function fetchWarnings(){try{const r=await fetch(MET_WARN_RSS);const xml=new DOMParser().parseFromString(await r.text(),"text/xml");const items=[...xml.querySelectorAll("item")];return items.map(x=>({title:x.querySelector("title")?.textContent||"",source:"Met Éireann",time:new Date().toISOString()}));}catch{return[]}}
-async function fetchRNLI(){try{const r=await fetch("https://api.rss2json.com/v1/api.json?rss_url="+encodeURIComponent(RNLI_RSS));const j=await r.json();return j.items.map(x=>({title:x.title,source:"RNLI",time:x.pubDate}));}catch{return[]}}
-async function fetchDoT(){if(!DOT_WORKER)return[];try{const r=await fetch(DOT_WORKER);const arr=await r.json();return arr.map(x=>({title:x.title,source:"DoT Marine Notices",time:x.pubDate}));}catch{return[]}}
+async function fetchWarnings(){try{const r=await fetch(MET_WARN_RSS);const xml=new DOMParser().parseFromString(await r.text(),"text/xml");const items=[...xml.querySelectorAll("item")];return items.map(x=>({title:x.querySelector("title")?.textContent||"",source:"Met Éireann",time:new Date().toLocaleTimeString('en-IE',{hour12:false})}));}catch{return[]}}
+async function fetchRNLI(){try{const r=await fetch("https://api.rss2json.com/v1/api.json?rss_url="+encodeURIComponent(RNLI_RSS));const j=await r.json();return j.items.map(x=>({title:x.title,source:"RNLI",time:new Date(x.pubDate).toLocaleTimeString('en-IE',{hour12:false})}));}catch{return[]}}
+async function fetchDoT(){if(!DOT_WORKER)return[];try{const r=await fetch(DOT_WORKER);const arr=await r.json();return arr.map(x=>({title:x.title,source:"DoT Marine Notices",time:new Date(x.pubDate).toLocaleTimeString('en-IE',{hour12:false})}));}catch{return[]}}
 
 /* Ticker */
 function renderTicker(items){
@@ -162,11 +164,15 @@ function renderTicker(items){
   if(!items.length){box.textContent="No current official headlines";return;}
   items.forEach(m=>{
     const d=document.createElement("div");d.className="tick";
-    let color="white";
-    if(m.source.includes("Met")) color="var(--warn-yellow)";
-    else if(m.source.includes("RNLI")) color="var(--rnli-orange)";
-    else if(m.source.includes("DoT")) color="var(--dot-green)";
-    d.innerHTML=`<div class="title" style="color:${color}">${m.title}</div><div class="meta" style="color:${color}">${m.source} • ${m.time}</div>`;
+    let badgeClass="";let badgeText="";
+    if(m.source.includes("Met")){badgeClass="met";badgeText="[Met]";}
+    else if(m.source.includes("RNLI")){badgeClass="rnli";badgeText="[RNLI]";}
+    else if(m.source.includes("DoT")){badgeClass="dot";badgeText="[DoT]";}
+    d.innerHTML=`
+      <span class="badge ${badgeClass}">${badgeText}</span>
+      <span class="title">${m.title}</span>
+      <div class="meta">${m.source} • ${m.time}</div>
+    `;
     box.appendChild(d);
   });
   let i=0;const t=box.querySelectorAll(".tick");t[0].classList.add("show");
