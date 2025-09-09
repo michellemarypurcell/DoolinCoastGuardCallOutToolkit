@@ -50,7 +50,7 @@
   #tideList li{padding:8px 0;border-bottom:1px dashed rgba(255,255,255,0.04);font-size:1rem}
   .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:0.95rem}
   .legend .box{display:inline-block;width:18px;height:18px;border-radius:4px;margin-right:6px;vertical-align:middle}
-  /* bottom ticker */
+  /* bottom ticker (fade/slide between items) */
   #tickerWrap{position:fixed;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);padding:12px 18px;border-top:3px solid rgba(255,255,255,0.04);z-index:200}
   #ticker{height:56px;display:flex;align-items:center;overflow:hidden}
   .tick{min-width:100%;opacity:0;transform:translateX(24px);transition:opacity .6s ease, transform .6s cubic-bezier(.2,.7,.2,1);padding:6px 12px}
@@ -137,51 +137,51 @@
 
 <script>
 /* ========= CONFIG ========= */
+/* ERDDAP station IDs use spaces and mixed case (e.g. "Galway Port"). */
 const LOCATION_LIST = [
-  { id: "DOOLIN", name: "Doolin Port", lat: 53.016, lon: -9.4, tide: "GALWAY_PORT" },
-  { id: "KILKEE", name: "Kilkee", lat: 52.678, lon: -9.644, tide: "KILRUSH" },
-  { id: "LAHINCH", name: "Lahinch", lat: 52.933, lon: -9.35, tide: "GALWAY_PORT" },
-  { id: "SPANISH_POINT", name: "Spanish Point", lat: 52.85, lon: -9.42, tide: "KILRUSH" },
-  { id: "FANORE", name: "Fanore", lat: 53.14, lon: -9.28, tide: "GALWAY_PORT" },
-  { id: "QUILTY", name: "Quilty", lat: 52.82, lon: -9.45, tide: "KILRUSH" },
-  { id: "WHITESTRAND", name: "Whitestrand", lat: 52.85, lon: -9.42, tide: "KILRUSH" },
-  { id: "KILRUSH", name: "Kilrush", lat: 52.64, lon: -9.48, tide: "KILRUSH" },
-  { id: "KINVARA", name: "Kinvara", lat: 53.14, lon: -8.93, tide: "GALWAY_PORT" },
-  { id: "GALWAY", name: "Galway", lat: 53.27, lon: -9.05, tide: "GALWAY_PORT" },
-  { id: "TRALEE", name: "Tralee", lat: 52.27, lon: -9.7, tide: "FENIT" },
-  { id: "DINGLE", name: "Dingle", lat: 52.14, lon: -10.27, tide: "VALENTIA" },
-  { id: "INIS_MOR", name: "Inis Mór", lat: 53.11, lon: -9.65, tide: "GALWAY_PORT" },
-  { id: "INIS_MEAIN", name: "Inis Meáin", lat: 53.08, lon: -9.57, tide: "GALWAY_PORT" },
-  { id: "INIS_OIRR", name: "Inis Oírr", lat: 53.06, lon: -9.51, tide: "GALWAY_PORT" }
+  /* West Clare & Aran vicinity */
+  { id: "DOOLIN", name: "Doolin Port", lat: 53.016, lon: -9.400, stationID: "Inishmore" },   // closest gauge
+  { id: "FANORE", name: "Fanore", lat: 53.140, lon: -9.280, stationID: "Galway Port" },
+  { id: "LAHINCH", name: "Lahinch", lat: 52.933, lon: -9.350, stationID: "Galway Port" },
+  { id: "SPANISH_POINT", name: "Spanish Point", lat: 52.850, lon: -9.420, stationID: "Kilrush Lough" },
+  { id: "QUILTY", name: "Quilty", lat: 52.820, lon: -9.450, stationID: "Kilrush Lough" },
+  { id: "WHITESTRAND", name: "Whitestrand", lat: 52.850, lon: -9.420, stationID: "Kilrush Lough" },
+  { id: "KILKEE", name: "Kilkee", lat: 52.678, lon: -9.644, stationID: "Kilrush Lough" },
+  { id: "KILRUSH", name: "Kilrush", lat: 52.640, lon: -9.480, stationID: "Kilrush Lough" },
+  /* Galway Bay / Connemara */
+  { id: "GALWAY", name: "Galway", lat: 53.270, lon: -9.050, stationID: "Galway Port" },
+  { id: "KINVARA", name: "Kinvara", lat: 53.140, lon: -8.930, stationID: "Galway Port" },
+  /* Kerry */
+  { id: "TRALEE", name: "Tralee", lat: 52.270, lon: -9.700, stationID: "Dingle Harbour" },
+  { id: "DINGLE", name: "Dingle", lat: 52.140, lon: -10.270, stationID: "Dingle Harbour" },
+  /* Aran Islands (map to Inishmore gauge) */
+  { id: "INIS_MOR", name: "Inis Mór", lat: 53.110, lon: -9.650, stationID: "Inishmore" },
+  { id: "INIS_MEAIN", name: "Inis Meáin", lat: 53.080, lon: -9.570, stationID: "Inishmore" },
+  { id: "INIS_OIRR", name: "Inis Oírr", lat: 53.060, lon: -9.510, stationID: "Inishmore" }
 ];
 
 const DEFAULT_LOCATION_KEY = "DOOLIN";
 const REFRESH_SECONDS = 60;
 const TICKER_ROTATE_SECONDS = 10;
-const RSS2JSON = "https://api.rss2json.com/v1/api.json?rss_url=";
-const RNLI_RSS = "https://rnli.org/news-and-media/rss-feeds/latest-news";
-const GOOGLE_SAR_RSS = "https://news.google.com/rss/search?q=Irish+Coast+Guard+SAR&hl=en-IE&gl=IE&ceid=IE:en";
-const ERDDAP_BASE = "https://erddap.marine.ie/erddap/tabledap";
-const OBSERVED_DS = "IrishNationalTideGaugeNetwork.json";
-const FORECAST_DS = "TidePrediction.json";
-const MET_WARN_XML = "https://www.met.ie/Open_Data/xml/warnings.xml";
+
+/* APIs */
+const OPEN_METEO = "https://api.open-meteo.com/v1/forecast";
+const ERDDAP = "https://erddap.marine.ie/erddap/tabledap";
+const DS_OBS = "IrishNationalTideGaugeNetwork.json";      // Water_Level_OD_Malin
+const DS_FCT = "IMI-TidePrediction.json";                 // Water_Level_ODM
+const DS_HILO = "IMI_TidePrediction_HighLow.json";        // tide_time_category + Water_Level_ODM
+const MET_WARN_RSS = "https://www.met.ie/warningsxml/rss.xml"; // official warnings feed
 
 /* ========= UTIL ========= */
 function el(id){return document.getElementById(id);}
-function logDebug(msg){const d=el('debug');d.innerHTML=new Date().toLocaleTimeString()+' — '+msg+'<br>'+d.innerHTML;}
+function logDebug(msg){const d=el('debug');d.innerHTML=new Date().toLocaleTimeString('en-IE',{hour12:false})+' — '+msg+'<br>'+d.innerHTML;}
 function isoNoMs(date){return date.toISOString().split('.')[0]+'Z';}
 function formatTimeISO(iso){ try { return new Date(iso).toLocaleTimeString('en-IE',{timeZone:'Europe/Dublin', hour12:false, hour:'2-digit', minute:'2-digit'}); } catch(e){return iso} }
-function hoursAgo(iso){ return (Date.now() - new Date(iso).getTime())/(1000*3600); }
-function niceRel(iso){
-  const h = hoursAgo(iso);
-  if (h<1) return Math.round(h*60)+'m ago';
-  return Math.round(h)+'h ago';
-}
 function degToCompass(deg){
   if(isNaN(deg)) return '';
   const val = Math.floor((deg/22.5)+0.5);
   const arr = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
-  return arr[(val % 16)];
+  return arr[val % 16];
 }
 
 /* ========= UI SETUP ========= */
@@ -215,12 +215,11 @@ setInterval(updateClockNow,1000);
 updateClockNow();
 
 /* ========= WEATHER ========= */
-const weatherMap = {
-  0:{svg:'sun'},1:{svg:'sun-cloud'},2:{svg:'sun-cloud'},3:{svg:'cloud'},45:{svg:'fog'},48:{svg:'fog'},
-  51:{svg:'drizzle'},53:{svg:'drizzle'},55:{svg:'rain'},61:{svg:'rain'},63:{svg:'rain'},65:{svg:'rain'},
-  80:{svg:'rain'},81:{svg:'rain'},82:{svg:'storm'},95:{svg:'storm'},96:{svg:'storm'}
+const weatherIconMap = {
+  0:'sun',1:'sun-cloud',2:'sun-cloud',3:'cloud',45:'fog',48:'fog',
+  51:'drizzle',53:'drizzle',55:'rain',61:'rain',63:'rain',65:'rain',
+  80:'rain',81:'rain',82:'storm',95:'storm',96:'storm',99:'storm'
 };
-/* tiny inline SVG icons for basic codes */
 function svgFor(name){
   const svgs = {
     sun:`<svg viewBox="0 0 64 64" width="80" height="80"><circle cx="32" cy="32" r="12" fill="#FFD54D"/></svg>`,
@@ -237,12 +236,11 @@ function svgFor(name){
 
 async function fetchWeather(){
   try{
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${CURRENT_LOCATION.lat}&longitude=${CURRENT_LOCATION.lon}&current_weather=true&hourly=temperature_2m,weathercode&timezone=Europe%2FDublin`;
+    const url = `${OPEN_METEO}?latitude=${CURRENT_LOCATION.lat}&longitude=${CURRENT_LOCATION.lon}&current_weather=true&hourly=temperature_2m,weathercode&timezone=Europe%2FDublin`;
     logDebug('Fetching weather: '+url);
     const r = await fetch(url);
     if(!r.ok) throw new Error('Weather fetch failed: '+r.status);
-    const j = await r.json();
-    return j;
+    return await r.json();
   }catch(e){ logDebug('Weather error: '+(e.message||e)); return null; }
 }
 
@@ -258,19 +256,16 @@ function renderWeather(j){
     return;
   }
   const now = j.current_weather;
-  const map = weatherMap[now.weathercode] || {svg:'default'};
-  iconEl.innerHTML = svgFor(map.svg);
-  el('weatherNow').innerHTML = `${map.label || map.svg} — <strong>${now.temperature}°C</strong>`;
+  const svgName = weatherIconMap[now.weathercode] || 'default';
+  iconEl.innerHTML = svgFor(svgName);
+  el('weatherNow').innerHTML = `<strong>${now.temperature}°C</strong>`;
   el('weatherDesc').textContent = `Measured at ${formatTimeISO(now.time)}`;
-  // wind: Open-Meteo gives wind speed in km/h by default for current_weather? It's m/s historically but our earlier usage used km/h. current_weather.windspeed in Open-Meteo is km/h when parameter set; assume km/h.
   const deg = now.winddirection;
   const compass = degToCompass(deg);
   el('windText').textContent = `${now.windspeed} km/h • ${Math.round(deg)}° ${compass}`;
-  // rotate compass arrow (compass has 0 = north)
   el('compassArrow').style.transform = `translate(-50%,-50%) rotate(${deg}deg)`;
   el('weatherTime').textContent = formatTimeISO(now.time);
 
-  // hourly forecast: pick next 3 hourly entries starting at or after now
   const hh = el('hourly'); hh.innerHTML = '';
   if (j.hourly && j.hourly.time && j.hourly.time.length){
     const times = j.hourly.time;
@@ -283,7 +278,7 @@ function renderWeather(j){
       if(t >= nowT){
         const d = document.createElement('div'); d.className='fh';
         const code = codes[i]; const temp = temps[i];
-        const sv = weatherMap[code] ? svgFor(weatherMap[code].svg) : svgFor('default');
+        const sv = svgFor(weatherIconMap[code] || 'default');
         d.innerHTML = `<div style="font-weight:700">${formatTimeISO(times[i])}</div><div style="font-size:26px">${sv}</div><div style="font-weight:700">${temp}°C</div>`;
         hh.appendChild(d);
         added++;
@@ -293,186 +288,139 @@ function renderWeather(j){
 }
 
 /* ========= TIDES ========= */
-async function fetchObservedTides(station, startISO, endISO){
-  try{
-    const url = `${ERDDAP_BASE}/${OBSERVED_DS}?station_id,sea_surface_height,time&station_id=${encodeURIComponent(station)}&time>=${startISO}&time<=${endISO}`;
-    logDebug('Fetching observed tides: '+url);
-    const r = await fetch(url);
-    if(!r.ok) throw new Error('Observed tide fetch failed: '+r.status);
-    const j = await r.json();
-    return (j.table?.rows || []).map(r=>({source:'observed', station:r[0], h: Number(r[1]), time: r[2]}));
-  }catch(e){ logDebug('Observed tides error: '+e.message); return []; }
-}
-async function fetchForecastTides(station, startISO, endISO){
-  try{
-    const url = `${ERDDAP_BASE}/${FORECAST_DS}?station_id,sea_surface_height,time&station_id=${encodeURIComponent(station)}&time>=${startISO}&time<=${endISO}`;
-    logDebug('Fetching forecast tides: '+url);
-    const r = await fetch(url);
-    if(!r.ok) throw new Error('Forecast tide fetch failed: '+r.status);
-    const j = await r.json();
-    return (j.table?.rows || []).map(r=>({source:'forecast', station:r[0], h: Number(r[1]), time: r[2]}));
-  }catch(e){ logDebug('Forecast tides error: '+e.message); return []; }
-}
-
-function mergeTides(obs, fct){
-  const all = [...obs, ...fct];
-  all.sort((a,b)=> new Date(a.time) - new Date(b.time));
-  return all;
-}
 function tideColor(h){
   if(h < 0.5) return 'red';
   if(h < 1.5) return 'orange';
   if(h <= 3.0) return 'limegreen';
   return 'deepskyblue';
 }
-function nextHighLowFromForecast(forecastList){
-  const now = Date.now();
-  let nextHigh=null, nextLow=null;
-  for(let i=1;i<forecastList.length-1;i++){
-    const prev = forecastList[i-1], curr = forecastList[i], nxt = forecastList[i+1];
-    const tcurr = new Date(curr.time).getTime();
-    if(tcurr < now) continue;
-    if(!nextHigh && curr.h > prev.h && curr.h > nxt.h) nextHigh = curr;
-    if(!nextLow && curr.h < prev.h && curr.h < nxt.h) nextLow = curr;
-    if(nextHigh && nextLow) break;
-  }
-  return { nextHigh, nextLow };
+
+async function fetchObserved(startISO, endISO){
+  const s = encodeURIComponent(CURRENT_LOCATION.stationID);
+  const url = `${ERDDAP}/${DS_OBS}?station_id,Water_Level_OD_Malin,time&station_id=%22${s}%22&time>=${startISO}&time<=${endISO}`;
+  try{
+    logDebug('Observed tides: '+url);
+    const r = await fetch(url);
+    if(!r.ok) throw new Error('Observed tide fetch failed '+r.status);
+    const j = await r.json();
+    return (j.table?.rows || []).map(r=>({source:'observed', h:+r[1], time:r[2]}));
+  }catch(e){ logDebug(e.message); return []; }
 }
-function renderTides(merged){
+async function fetchForecast(startISO, endISO){
+  const s = encodeURIComponent(CURRENT_LOCATION.stationID);
+  const url = `${ERDDAP}/${DS_FCT}?stationID,Water_Level_ODM,time&stationID=%22${s}%22&time>=${startISO}&time<=${endISO}`;
+  try{
+    logDebug('Forecast tides: '+url);
+    const r = await fetch(url);
+    if(!r.ok) throw new Error('Forecast tide fetch failed '+r.status);
+    const j = await r.json();
+    return (j.table?.rows || []).map(r=>({source:'forecast', h:+r[1], time:r[2]}));
+  }catch(e){ logDebug(e.message); return []; }
+}
+async function fetchHighLow(nextHours=48){
+  const s = encodeURIComponent(CURRENT_LOCATION.stationID);
+  const now = new Date();
+  const end = new Date(now.getTime()+nextHours*3600*1000);
+  const url = `${ERDDAP}/${DS_HILO}?stationID,tide_time_category,Water_Level_ODM,time&stationID=%22${s}%22&time>=${isoNoMs(now)}&time<=${isoNoMs(end)}`;
+  try{
+    logDebug('HighLow: '+url);
+    const r = await fetch(url);
+    if(!r.ok) throw new Error('HighLow fetch failed '+r.status);
+    const j = await r.json();
+    const rows = j.table?.rows || [];
+    const highs = rows.filter(r=> (r[1]||'').toString().toLowerCase().includes('high'));
+    const lows  = rows.filter(r=> (r[1]||'').toString().toLowerCase().includes('low'));
+    const nextHigh = highs.length ? {time: highs[0][3], h:+highs[0][2]} : null;
+    const nextLow  = lows.length ? {time: lows[0][3], h:+lows[0][2]} : null;
+    return { nextHigh, nextLow };
+  }catch(e){ logDebug(e.message); return {nextHigh:null,nextLow:null}; }
+}
+
+function renderTides(observed, forecast, hiLo){
   const listEl = el('tideList'); listEl.innerHTML = '';
-  if(!merged || !merged.length){ el('tideSummary').textContent = 'No tide data available'; el('tideSpinner').style.display='none'; return; }
-  // build list items
-  for(let i=0;i<merged.length;i++){
-    const it = merged[i];
+  // merge and render
+  const all = [...observed, ...forecast].sort((a,b)=> new Date(a.time) - new Date(b.time));
+  if(!all.length){
+    el('tideSummary').textContent = 'No tide data available';
+    el('tideSpinner').style.display='none';
+    return;
+  }
+  all.forEach((it,i)=>{
     const color = tideColor(it.h);
     let arrow = '';
-    if(i < merged.length - 1){
-      const nxt = merged[i+1];
+    if(i < all.length - 1){
+      const nxt = all[i+1];
       if(nxt.h > it.h) arrow = '⬆'; else if(nxt.h < it.h) arrow = '⬇';
     }
     const li = document.createElement('li');
     li.style.color = color;
     li.innerHTML = `<strong>${formatTimeISO(it.time)}</strong> — ${it.h.toFixed(2)} m ${arrow} <span style="opacity:.75">(${it.source})</span>`;
     listEl.appendChild(li);
-  }
-  // summary from forecast portion
-  const forecastPortion = merged.filter(x=>x.source==='forecast');
-  const { nextHigh, nextLow } = nextHighLowFromForecast(forecastPortion);
+  });
+
+  // summary with Hi/Low
   let parts = [];
-  if(nextHigh) parts.push(`Next High: ${formatTimeISO(nextHigh.time)} (${nextHigh.h.toFixed(2)} m)`);
-  if(nextLow) parts.push(`Next Low: ${formatTimeISO(nextLow.time)} (${nextLow.h.toFixed(2)} m)`);
+  if(hiLo.nextHigh) parts.push(`Next High: ${formatTimeISO(hiLo.nextHigh.time)} (${hiLo.nextHigh.h.toFixed(2)} m)`);
+  if(hiLo.nextLow) parts.push(`Next Low: ${formatTimeISO(hiLo.nextLow.time)} (${hiLo.nextLow.h.toFixed(2)} m)`);
   el('tideSummary').textContent = parts.length ? parts.join(' — ') : 'Next high/low not available';
   el('tideSpinner').style.display='none';
 }
 
-/* ========= MET WARNINGS ========= */
+/* ========= MET ÉIREANN WARNINGS (official feed) ========= */
 async function fetchMetWarnings(){
   try{
-    const r = await fetch(MET_WARN_XML);
+    const r = await fetch(MET_WARN_RSS);  // Atom/RSS (official)
     if(!r.ok) throw new Error('Met warnings fetch failed: '+r.status);
-    const txt = await r.text();
-    const parser = new DOMParser(); const xml = parser.parseFromString(txt,'text/xml');
-    const warnings = [];
-    // try structured nodes
-    const nodes = xml.querySelectorAll('warning,alert,issue');
-    nodes.forEach(nd=>{
-      const text = (nd.textContent || '').trim();
-      const up = text.toUpperCase();
-      const found = (up.includes('RED') && 'RED') || (up.includes('ORANGE') && 'ORANGE') || (up.includes('YELLOW') && 'YELLOW');
-      if(found){
-        warnings.push({
-          level: found,
-          headline: (nd.querySelector('headline')?.textContent || nd.querySelector('title')?.textContent || text.split('\n')[0]).trim(),
-          text: (nd.querySelector('description')?.textContent || text).trim(),
-          pubDate: nd.querySelector('pubDate')?.textContent || new Date().toISOString()
-        });
-      }
-    });
-    // fallback: string search
-    if(!warnings.length){
-      const up = txt.toUpperCase();
-      if(up.includes('RED')||up.includes('ORANGE')||up.includes('YELLOW')){
-        const lvl = up.includes('RED') ? 'RED' : up.includes('ORANGE') ? 'ORANGE' : 'YELLOW';
-        warnings.push({ level: lvl, headline: 'Met Éireann warning: '+lvl, text:'See Met Éireann', pubDate: new Date().toISOString()});
-      }
-    }
-    return warnings;
+    const xml = new DOMParser().parseFromString(await r.text(),'text/xml');
+    // Atom: <entry> elements; RSS: <item>
+    const entries = [...xml.querySelectorAll('entry, item')];
+    const items = entries.map(e=>{
+      const title = (e.querySelector('title')?.textContent || '').trim();
+      const pub   = (e.querySelector('updated, pubDate')?.textContent || '').trim();
+      const desc  = (e.querySelector('summary, description')?.textContent || '').trim();
+      const up = (title + ' ' + desc).toUpperCase();
+      const level = up.includes('RED') ? 'RED' : up.includes('ORANGE') ? 'ORANGE' : up.includes('YELLOW') ? 'YELLOW' : null;
+      return level ? {title, summary: desc.replace(/(<([^>]+)>)/gi,''), pubDate: pub || new Date().toISOString(), source:'Met Éireann', level} : null;
+    }).filter(Boolean);
+    return items;
   }catch(e){ logDebug('Met warnings error: '+e.message); return []; }
 }
 
-/* ========= NEWS (RSS via rss2json) ========= */
-async function fetchRssProxy(rss, label){
-  try{
-    const url = RSS2JSON + encodeURIComponent(rss);
-    logDebug('Fetching rss: '+url);
-    const r = await fetch(url);
-    if(!r.ok) throw new Error('RSS proxy failed: '+r.status);
-    const j = await r.json();
-    const items = (j.items || []).map(it=>({
-      title: it.title || '(no title)',
-      link: it.link,
-      pubDate: it.pubDate || it.isoDate || new Date().toISOString(),
-      summary: (it.description || it.content || '').replace(/(<([^>]+)>)/gi, "").trim().slice(0,240),
-      source: label || (j.feed?.title || 'News')
-    }));
-    return items;
-  }catch(e){ logDebug('RSS fetch error ('+label+'): '+e.message); return []; }
+function showWarningBanner(items){
+  if(!items.length){ el('warningBanner').style.display='none'; return; }
+  // prefer highest severity
+  const order = {RED:3, ORANGE:2, YELLOW:1};
+  items.sort((a,b)=> (order[b.level]-order[a.level]));
+  const top = items[0];
+  const banner = el('warningBanner'); banner.style.display='block';
+  const color = top.level==='RED'? 'var(--warn-red)': top.level==='ORANGE'?'var(--warn-orange)':'var(--warn-yellow)';
+  banner.style.background = color; banner.textContent = `${top.level} Warning — ${top.title}`;
+  const ol = el('warningOverlay'); ol.style.background=color; ol.style.display='block'; ol.textContent = `${top.level} — ${top.title}`;
+  setTimeout(()=>{ ol.style.display='none'; }, 8000);
 }
 
-async function buildTicker(){
-  try{
-    const metWarnings = await fetchMetWarnings();
-    // weather news (google search for weather ireland)
-    const weatherNews = await fetchRssProxy('https://news.google.com/rss/search?q=weather+ireland&hl=en-IE&gl=IE&ceid=IE:en','Weather News');
-    const rnli = await fetchRssProxy(RNLI_RSS,'RNLI');
-    const googleSAR = await fetchRssProxy(GOOGLE_SAR_RSS,'Google News (SAR)');
-    // convert met warnings into ticker items with high priority
-    const ticker = [];
-    metWarnings.forEach(w=>{
-      if(['RED','ORANGE','YELLOW'].includes((w.level||'').toUpperCase())){
-        ticker.push({title:w.headline, link:'#', pubDate:w.pubDate || new Date().toISOString(), summary:w.text || '', source:'Met Éireann', priority:0});
-      }
-    });
-    const cutoff = Date.now() - 48*3600*1000;
-    const addIfRecent = (items,prio)=>{
-      items.forEach(it=>{
-        if(new Date(it.pubDate).getTime() >= cutoff){
-          ticker.push({...it,priority:prio});
-        }
-      });
-    };
-    addIfRecent(weatherNews,1); addIfRecent(rnli,2); addIfRecent(googleSAR,3);
-    // sort by priority then recency
-    ticker.sort((a,b)=> (a.priority - b.priority) || (new Date(b.pubDate)-new Date(a.pubDate)));
-    return ticker;
-  }catch(e){ logDebug('buildTicker error: '+e.message); return []; }
-}
-
-/* render ticker with fade+slide rotation */
-let tickerIndex = 0;
-let tickerItems = [];
+/* ========= TICKER (official-only) ========= */
 let tickerTimer = null;
 function renderTicker(items){
   const tEl = el('ticker');
   tEl.innerHTML = '';
   if(!items || !items.length){
-    const d = document.createElement('div'); d.className='tick show'; d.innerHTML = `<div class="title">No recent headlines</div><div class="meta">—</div>`; tEl.appendChild(d); return;
+    const d = document.createElement('div'); d.className='tick show'; d.innerHTML = `<div class="title">No current official warnings</div><div class="meta">—</div>`; tEl.appendChild(d); return;
   }
+  // Rotate one item at a time (fade/slide)
   items.forEach(it=>{
     const d = document.createElement('div'); d.className='tick';
-    d.innerHTML = `<div><div class="title">${it.title}</div><div class="meta">${it.source} • ${formatTimeISO(it.pubDate)} • ${it.summary}</div></div>`;
+    d.innerHTML = `<div><div class="title">${it.title}</div><div class="meta">${it.source} • ${formatTimeISO(it.pubDate)} • ${it.summary.slice(0,180)}</div></div>`;
     tEl.appendChild(d);
   });
   const ticks = tEl.querySelectorAll('.tick');
-  // show first
-  ticks.forEach(x=>x.classList.remove('show'));
-  tickerIndex = 0;
-  ticks[tickerIndex].classList.add('show');
+  let idx = 0;
+  ticks[idx].classList.add('show');
   if(tickerTimer) clearInterval(tickerTimer);
   tickerTimer = setInterval(()=>{
-    ticks[tickerIndex].classList.remove('show');
-    tickerIndex = (tickerIndex + 1) % ticks.length;
-    ticks[tickerIndex].classList.add('show');
+    ticks[idx].classList.remove('show');
+    idx = (idx + 1) % ticks.length;
+    ticks[idx].classList.add('show');
   }, TICKER_ROTATE_SECONDS*1000);
 }
 
@@ -485,56 +433,38 @@ async function fetchAndRenderAll(){
     el('tideSpinner').style.display = 'inline-block';
     el('tideSummary').textContent = 'Loading tides…';
     el('tideList').innerHTML = '';
-    // Met warnings
-    const metWarnings = await fetchMetWarnings();
-    if(metWarnings && metWarnings.length){
-      metWarnings.sort((a,b)=> ( (b.level==='RED')?3:(b.level==='ORANGE')?2:1 ) - ( (a.level==='RED')?3:(a.level==='ORANGE')?2:1 ));
-      const top = metWarnings[0];
-      const banner = el('warningBanner'); banner.style.display='block';
-      const color = top.level==='RED'? 'var(--warn-red)': top.level==='ORANGE'?'var(--warn-orange)':'var(--warn-yellow)';
-      banner.style.background = color; banner.textContent = `${top.level} Warning — ${top.headline}`;
-      // overlay flash
-      const ol = el('warningOverlay'); ol.style.background=color; ol.style.display='block'; ol.textContent = `${top.level} — ${top.headline}`;
-      setTimeout(()=>{ ol.style.display='none'; }, 10000);
-    } else {
-      el('warningBanner').style.display='none';
-    }
 
-    // weather
+    // Warnings + banner + ticker
+    const warns = await fetchMetWarnings();  // official-only
+    showWarningBanner(warns);
+    renderTicker(warns.filter(w=>['RED','ORANGE','YELLOW'].includes(w.level)));
+
+    // Weather
     const weatherJson = await fetchWeather();
     renderWeather(weatherJson);
 
-    // tides: observed (past12) + forecast (next12)
+    // Tides
     const now = new Date();
     const obsStart = isoNoMs(new Date(now.getTime() - 12*3600*1000));
     const obsEnd = isoNoMs(now);
     const fStart = isoNoMs(now);
     const fEnd = isoNoMs(new Date(now.getTime() + 12*3600*1000));
-    let observed = await fetchObservedTides(CURRENT_LOCATION.tide, obsStart, obsEnd).catch(e=>{logDebug(e.message); return []});
-    let forecast = await fetchForecastTides(CURRENT_LOCATION.tide, fStart, fEnd).catch(e=>{logDebug(e.message); return []});
-    // merged chronological
-    const merged = mergeTides(observed, forecast);
-    if(!merged.length){
-      el('tideList').innerHTML = ''; el('tideSummary').textContent = 'No tide data available';
-      el('tideSpinner').style.display='none';
-    } else {
-      renderTides(merged);
-    }
 
-    // ticker items
-    const items = await buildTicker();
-    tickerItems = items;
-    renderTicker(tickerItems);
+    const [observed, forecast, hilo] = await Promise.all([
+      fetchObserved(obsStart, obsEnd),
+      fetchForecast(fStart, fEnd),
+      fetchHighLow(48)
+    ]);
+    renderTides(observed, forecast, hilo);
 
   }catch(e){
     logDebug('Main update error: '+(e.message||e));
   }
 }
 
-/* initial run */
+/* initial run + periodic refresh */
 fetchAndRenderAll();
 setInterval(fetchAndRenderAll, REFRESH_SECONDS*1000);
-
 </script>
 </body>
 </html>
