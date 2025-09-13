@@ -5,177 +5,75 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Doolin Coast Guard Call-out OPs</title>
 <style>
-  :root{
-    --bg-overlay: rgba(0,0,0,0.76);
-    --accent: #2aa3ff;
-    --white: #fff;
-    --warn-yellow: #ffd54d;
-    --rnli-orange: #ff9800;
-    --dot-green: #66bb6a;
-  }
-  body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#0b0b0b url('background.jpg') center/cover no-repeat fixed;color:var(--white);display:flex;flex-direction:column}
-  header{padding:12px;background:rgba(0,0,0,0.65)}
-  h1{margin:0;font-size:2.2rem;text-align:center}
-  #warningBanner{display:none;padding:14px;margin-top:10px;border-radius:8px;color:#111;font-weight:800;text-align:center}
-
-  /* SAR Incident Panel */
-  #sarIncident{background:rgba(220,0,0,0.85);color:white;padding:16px;margin:10px;border-radius:10px;text-align:center}
-  #sarIncident h2{margin:0 0 10px}
-  #incidentDetails{font-size:1.2rem;font-weight:600}
-
-  /* Admin Input Panel */
-  #adminPanel{display:none;background:rgba(255,0,0,0.85);padding:14px;margin:10px;border-radius:10px}
-  #adminPanel h3{margin-top:0}
-  #adminPanel input{margin-top:4px;margin-bottom:8px}
-
-  #infoBar{position:sticky;top:0;z-index:1000;background:var(--bg-overlay);display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:3px solid var(--accent);flex-wrap:wrap}
-  #infoBar .left{font-size:1.2rem}
-  #infoBar .right{display:flex;align-items:center;gap:12px;font-size:1rem;flex-wrap:wrap}
-  #locationSelect{padding:8px;border-radius:8px;background:rgba(255,255,255,0.07);color:var(--white);border:1px solid rgba(255,255,255,0.2)}
-
-  main{flex:1;display:flex;gap:24px;padding:18px}
-  .panel{flex:1;background:rgba(0,0,0,0.7);padding:20px;border-radius:14px;display:flex;flex-direction:column}
-  h2{text-align:center;font-size:1.6rem;margin:0 0 12px}
-  #weatherIconSvg{width:100px;height:100px}
-  .forecastHours{display:flex;gap:12px;overflow:hidden;margin-top:12px}
-  .fh{min-width:100px;background:rgba(255,255,255,0.08);padding:10px;border-radius:10px;text-align:center}
-
-  /* Compass */
-  #compass{position:relative;width:80px;height:80px;border-radius:50%;border:3px solid rgba(255,255,255,0.25)}
-  #compassArrow{position:absolute;left:50%;top:50%;width:5px;height:34px;background:red;border-radius:3px;transform-origin:50% 85%;transform:translate(-50%,-50%) rotate(0deg)}
-  .compass-label{position:absolute;font-size:0.9rem;font-weight:800;opacity:.85}
-  .n{left:50%;top:-16px;transform:translateX(-50%);color:red}
-  .s{left:50%;bottom:-16px;transform:translateX(-50%)}
-  .e{right:-16px;top:50%;transform:translateY(-50%)}
-  .w{left:-16px;top:50%;transform:translateY(-50%)}
-
-  /* Tides */
-  #tideList{list-style:none;padding:0;margin:0;max-height:420px;overflow:auto}
-  #tideList li{padding:9px 0;border-bottom:1px dashed rgba(255,255,255,0.1);font-size:1.1rem}
-  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:1rem}
-  .legend .box{display:inline-block;width:18px;height:18px;border-radius:4px;margin-right:6px}
-
-  /* SAR ticker */
-  #tickerWrap{position:fixed;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);padding:16px 20px;border-top:4px solid rgba(255,255,255,0.1);z-index:2000;transition:background .3s ease}
-  #ticker{height:74px;display:flex;align-items:center;overflow:hidden}
-  .tick{min-width:100%;opacity:0;transform:translateX(28px);transition:all .6s ease;padding:6px}
-  .tick.show{opacity:1;transform:translateX(0)}
-  .tick .title{font-weight:900;font-size:1.35rem}
-  .tick .meta{font-size:1.15rem;opacity:0.9}
-  .badge{font-weight:900;padding:2px 6px;border-radius:4px;margin-right:8px}
-  .badge.met{background:var(--warn-yellow);color:#000;animation:flash 1s infinite}
-  .badge.rnli{background:var(--rnli-orange);color:#000}
-  .badge.dot{background:var(--dot-green);color:#000}
-  @keyframes flash {0%,50%,100%{opacity:1}25%,75%{opacity:0.2}}
-
-  footer{padding:12px;text-align:center;font-size:1.1rem;background:rgba(0,0,0,0.35);position:relative}
-  #adminLink{position:absolute;right:10px;bottom:10px;font-size:0.8rem;opacity:0.3;cursor:pointer}
-  #adminLink:hover{opacity:1}
-
-  /* Mobile view */
-  @media(max-width: 768px){
-    main{flex-direction:column}
-    .panel{margin-bottom:16px}
-    .tick .title{font-size:1.1rem}
-    .tick .meta{font-size:0.9rem}
-    #ticker{height:auto}
-    #infoBar .left{font-size:1rem}
-    #infoBar .right{font-size:0.9rem}
-  }
+  body{margin:0;font-family:Arial, sans-serif;background:#0b0b0b;color:#fff}
+  header{padding:12px;background:#222;text-align:center}
+  h1{margin:0}
+  #sarIncident{background:#b00;color:#fff;padding:16px;margin:10px;border-radius:10px;text-align:center}
+  #adminPanel{display:none;background:#600;padding:14px;margin:10px;border-radius:10px}
+  #infoBar{background:#111;padding:8px;display:flex;justify-content:space-between;flex-wrap:wrap}
+  main{display:flex;gap:20px;padding:10px}
+  .panel{flex:1;background:#222;padding:12px;border-radius:8px}
+  footer{text-align:center;padding:12px;background:#111;position:relative}
+  #adminLink{cursor:pointer;color:#0af;font-size:0.9rem}
 </style>
 </head>
 <body>
 <header>
   <h1>Doolin Coast Guard Call-out OPs</h1>
-  <div id="warningBanner"></div>
 </header>
 
-<!-- SAR INCIDENT PANEL -->
 <section id="sarIncident">
   <h2>Latest Coast Guard Incident</h2>
   <div id="incidentDetails"><p>No active incident entered.</p></div>
 </section>
 
-<!-- ADMIN INPUT (only visible with ?admin=1) -->
 <div id="adminPanel">
   <h3>Admin Input – Coast Guard Incident</h3>
-  <label>Incident # <input id="incNum" style="width:80px"></label><br><br>
-  <label>Title <input id="incTitle" style="width:90%"></label><br><br>
-  <label>Summary <input id="incSummary" style="width:90%"></label><br><br>
-  <label>Location <input id="incLoc" style="width:90%"></label><br><br>
+  <label>Incident # <input id="incNum"></label><br>
+  <label>Title <input id="incTitle"></label><br>
+  <label>Summary <input id="incSummary"></label><br>
+  <label>Location <input id="incLoc"></label><br>
   <button onclick="saveIncident()">Save</button>
 </div>
 
 <div id="infoBar">
-  <div class="left"><strong id="locName">Doolin Port</strong> — <span id="latlon">Lat: 53.016, Lon: -9.400</span> — <span id="dataFrom">Data from: --:--:--</span></div>
-  <div class="right">
+  <div><strong id="locName">Doolin Port</strong></div>
+  <div>
     <label for="locationSelect">Location:</label>
     <select id="locationSelect"></select>
-    <div id="clock"><strong>Current time:</strong> --:--:--</div>
   </div>
 </div>
 
 <main>
-  <section class="panel">
+  <div class="panel">
     <h2>Weather</h2>
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap">
-      <div style="display:flex;gap:16px;align-items:center">
-        <svg id="weatherIconSvg"></svg>
-        <div>
-          <div id="weatherNow" style="font-size:1.4rem;font-weight:900"></div>
-          <div id="weatherDesc"></div>
-        </div>
-      </div>
-      <div style="text-align:right">
-        <div id="weatherTime"></div>
-        <div style="display:flex;gap:14px;margin-top:10px;align-items:center;flex-wrap:wrap">
-          <div id="compass">
-            <div class="compass-label n">N</div><div class="compass-label s">S</div>
-            <div class="compass-label e">E</div><div class="compass-label w">W</div>
-            <div id="compassArrow"></div>
-          </div>
-          <div id="windText" style="font-weight:800;font-size:1.2rem"></div>
-        </div>
-      </div>
-    </div>
-    <div style="margin-top:14px"><div style="font-weight:900;margin-bottom:6px">Last hour + next 5 hours</div><div id="hourly" class="forecastHours"></div></div>
-  </section>
-
-  <section class="panel">
+    <div id="weatherData">Loading…</div>
+  </div>
+  <div class="panel">
     <h2>Tides</h2>
-    <div id="tideSummary" style="font-weight:900;margin-bottom:10px">Loading…</div>
-    <ul id="tideList"></ul>
-    <div class="legend">
-      <div><span class="box" style="background:red"></span>Low</div>
-      <div><span class="box" style="background:orange"></span>Caution</div>
-      <div><span class="box" style="background:limegreen"></span>Good</div>
-      <div><span class="box" style="background:deepskyblue"></span>Very High</div>
-    </div>
-  </section>
+    <div id="tideData">Loading…</div>
+  </div>
 </main>
 
-<div id="tickerWrap"><div id="ticker"></div></div>
 <footer>
-  <span id="latestData">Latest data as of: --</span>
+  <span id="latestData">Latest data as of: --</span><br>
   <span id="adminLink" onclick="goAdmin()">🔒 Admin Login</span>
 </footer>
 
 <script>
-/* Admin Login Link */
-function goAdmin(){window.location.search='?admin=1';}
-
-/* SAR Incident Admin Mode */
+/* Admin login */
+function goAdmin(){ window.location.search='?admin=1'; }
 if(window.location.search.includes("admin=1")){
   document.getElementById("adminPanel").style.display="block";
 }
+
+/* Incident store */
 function loadIncident(){
   const data=JSON.parse(localStorage.getItem("cgIncident")||"{}");
   if(data && data.title){
-    document.getElementById("incidentDetails").innerHTML=`
-      <strong>Incident #${data.num}:</strong> ${data.title}<br>
-      ${data.summary}<br>
-      <em>Location: ${data.loc}</em>
-    `;
+    document.getElementById("incidentDetails").innerHTML=
+      `<strong>Incident #${data.num}:</strong> ${data.title}<br>
+       ${data.summary}<br><em>Location: ${data.loc}</em>`;
   }
 }
 function saveIncident(){
@@ -190,7 +88,44 @@ function saveIncident(){
 }
 loadIncident();
 
-/* Location list, weather, tides, ticker... (same as in the previous version) */
+/* Locations */
+const LOCS={
+  "DOOLIN":{name:"Doolin Port",lat:53.016,lon:-9.4,station:"Inishmore"},
+  "KILKEE":{name:"Kilkee",lat:52.678,lon:-9.644,station:"Kilrush"}
+};
+const sel=document.getElementById("locationSelect");
+for(const [id,l] of Object.entries(LOCS)){
+  const o=document.createElement("option");
+  o.value=id;o.textContent=l.name;
+  if(id==="DOOLIN") o.selected=true;
+  sel.appendChild(o);
+}
+let CUR=LOCS["DOOLIN"];
+sel.onchange=()=>{CUR=LOCS[sel.value];updateAll();};
+
+/* Weather + Tides (simplified) */
+async function updateAll(){
+  document.getElementById("locName").textContent=CUR.name;
+  document.getElementById("latestData").textContent=
+    "Latest data as of: "+new Date().toLocaleTimeString();
+  try{
+    const w=await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${CUR.lat}&longitude=${CUR.lon}&current_weather=true`);
+    const j=await w.json();
+    document.getElementById("weatherData").textContent=
+      `${j.current_weather.temperature}°C, ${j.current_weather.windspeed} km/h`;
+  }catch{document.getElementById("weatherData").textContent="Error";}
+
+  try{
+    const now=new Date();
+    const s=now.toISOString().split('.')[0]+"Z";
+    const e=new Date(now.getTime()+6*3600e3).toISOString().split('.')[0]+"Z";
+    const url=`https://erddap.marine.ie/erddap/tabledap/TidePrediction.json?station_id,sea_surface_height,time&station_id=${CUR.station}&time>=${s}&time<=${e}`;
+    const t=await fetch(url); const j=await t.json();
+    document.getElementById("tideData").textContent=
+      j.table?.rows?.map(r=>`${r[2]} → ${r[1]}m`).join(" | ") || "No data";
+  }catch{document.getElementById("tideData").textContent="Error";}
+}
+updateAll();
 </script>
 </body>
 </html>
