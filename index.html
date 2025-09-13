@@ -34,7 +34,9 @@
   .w{left:-18px;top:50%;transform:translateY(-50%)}
   /* Tide list */
   #tideData ul{list-style:none;padding:0;margin:0;display:flex;flex-wrap:wrap;gap:12px}
-  #tideData li{font-size:1.1rem;font-weight:600}
+  #tideData li{font-size:1.1rem;font-weight:600;padding:2px 6px;border-radius:6px}
+  .flash{animation:flash 1s infinite}
+  @keyframes flash {0%{background:yellow;color:black}50%{background:none}100%{background:yellow;color:black}}
   #debug{position:fixed;left:0;right:0;bottom:0;background:rgba(0,0,0,.8);color:#0f0;padding:6px;font:12px/1.3 Consolas,monospace;max-height:140px;overflow:auto}
   footer{text-align:center;padding:12px;background:#111;color:#ddd}
   #adminLink{display:inline-block;margin-top:6px;color:#4db3ff;cursor:pointer;text-decoration:underline}
@@ -152,15 +154,18 @@ startClock();
 /* Weather */
 function compassDir(deg){const dirs=["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];return dirs[Math.round(deg/22.5)%16];}
 function iconForCode(c){if(c===0)return"☀️";if([1,2,3].includes(c))return"🌤";if([45,48].includes(c))return"🌫";if([51,53,55,56,57,61,63,65,66,67].includes(c))return"🌦";if([71,73,75,77].includes(c))return"❄️";if([80,81,82].includes(c))return"🌧";if([95,96,99].includes(c))return"⛈";return"❓";}
-function loadWeather(){const u=`https://api.open-meteo.com/v1/forecast?latitude=${CUR.lat}&longitude=${CUR.lon}&current=temperature_2m,wind_speed_10m,wind_direction_10m,weathercode&timezone=Europe%2FDublin`;log("Weather "+u);
- fetch(u).then(r=>r.json()).then(j=>{
-  if(!j.current){qs("weatherData").textContent="No weather";return;}
-  const c=j.current;
-  qs("weatherIcon").textContent=iconForCode(c.weathercode);
-  qs("weatherData").innerHTML=`Temp: ${c.temperature_2m}°C<br>Wind: ${c.wind_speed_10m} km/h`;
-  qs("compassArrow").style.transform=`translate(-50%,-50%) rotate(${c.wind_direction_10m}deg)`;
-  qs("windText").textContent=`${c.wind_direction_10m}° ${compassDir(c.wind_direction_10m)}`;
- }).catch(e=>{qs("weatherData").textContent="Weather error";log("Weather error "+e);});}
+function loadWeather(){
+  const u=`https://api.open-meteo.com/v1/forecast?latitude=${CUR.lat}&longitude=${CUR.lon}&current=temperature_2m,wind_speed_10m,wind_direction_10m,weathercode&timezone=Europe%2FDublin`;
+  log("Weather "+u);
+  fetch(u).then(r=>r.json()).then(j=>{
+    if(!j.current){qs("weatherData").textContent="No weather";return;}
+    const c=j.current;
+    qs("weatherIcon").textContent=iconForCode(c.weathercode);
+    qs("weatherData").innerHTML=`Temp: ${c.temperature_2m}°C<br>Wind: ${c.wind_speed_10m} km/h`;
+    qs("compassArrow").style.transform=`translate(-50%,-50%) rotate(${c.wind_direction_10m}deg)`;
+    qs("windText").textContent=`${c.wind_direction_10m}° ${compassDir(c.wind_direction_10m)}`;
+  }).catch(e=>{qs("weatherData").textContent="Weather error";log("Weather error "+e);});
+}
 
 /* Tides */
 function isoNoMs(d){return d.toISOString().split('.')[0]+"Z";}
@@ -182,26 +187,32 @@ function loadTide(){
       return;
     }
 
-    // Find min & max
-    const heights=rows.map(r=>parseFloat(r[2]));
+    const limitedRows=rows.slice(0,6);
+    const heights=limitedRows.map(r=>parseFloat(r[2]));
     const minH=Math.min(...heights);
     const maxH=Math.max(...heights);
 
-    const list=rows.map(r=>{
+    const now=new Date();
+    let nextIdx=-1;
+    limitedRows.forEach((r,i)=>{
+      const t=new Date(r[1]);
+      const h=parseFloat(r[2]);
+      if(t>now && (h===minH||h===maxH) && nextIdx===-1){nextIdx=i;}
+    });
+
+    const list=limitedRows.map((r,i)=>{
       const t=new Date(r[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
       const h=parseFloat(r[2]);
       let style=`color:${tideColor(h)};`;
       let extra="";
       if(h===minH) extra="<strong> (Low)</strong>";
       if(h===maxH) extra="<strong> (High)</strong>";
-      return `<li style="${style}">${t} — <b>${h.toFixed(2)} m</b>${extra}</li>`;
+      let cls=(i===nextIdx)?"flash":"";
+      return `<li class="${cls}" style="${style}">${t} — <b>${h.toFixed(2)} m</b>${extra}</li>`;
     }).join("");
 
     qs("tideData").innerHTML=`<ul>${list}</ul>`;
-  }).catch(e=>{
-    qs("tideData").textContent="Tide error";
-    log("Tide err "+e);
-  });
+  }).catch(e=>{qs("tideData").textContent="Tide error";log("Tide err "+e);});
 }
 
 /* Refresh */
