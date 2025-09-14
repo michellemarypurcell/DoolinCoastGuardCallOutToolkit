@@ -16,7 +16,9 @@
   #locName{font-weight:800}
   #latlon{color:#ddd}
   #locationSelect{background:#0f0f0f;color:#fff;border:1px solid #333;padding:6px;border-radius:8px}
-  main{display:flex;gap:20px;padding:16px;height:calc(100vh - 230px);box-sizing:border-box}
+  #mapBox{text-align:center;margin:10px 0}
+  #mapImg{border-radius:8px;border:2px solid #333}
+  main{display:flex;gap:20px;padding:16px;height:calc(100vh - 280px);box-sizing:border-box}
   .panel{flex:1 1 50%;background:#1c1c1c;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:center}
   .panel h2{text-align:center;margin:0 0 14px;font-size:1.6rem}
   /* Weather visuals */
@@ -32,7 +34,7 @@
   .w{left:-20px;top:50%;transform:translateY(-50%)}
   #windText{text-align:center;font-size:1.2rem;margin-top:6px}
   /* Tide visuals */
-  #tideChart{height:140px;display:flex;align-items:flex-end;gap:8px;justify-content:center;margin-top:12px}
+  #tideChart{height:160px;display:flex;align-items:flex-end;gap:8px;justify-content:center;margin-top:12px}
   .bar{flex:1;min-width:40px;text-align:center;color:#fff;font-size:0.9rem;font-weight:600;border-radius:6px 6px 0 0;display:flex;flex-direction:column;justify-content:flex-end}
   .bar span{background:rgba(0,0,0,0.4);width:100%;padding:2px;border-radius:0 0 6px 6px}
   #nextTide{margin-top:10px;text-align:center;font-weight:700;color:#fff;font-size:1.2rem}
@@ -61,6 +63,10 @@
     <select id="locationSelect"></select>
     <span id="clock">Current time: --:--:--</span>
   </div>
+</div>
+
+<div id="mapBox">
+  <img id="mapImg" src="" alt="Location map" width="320" height="200">
 </div>
 
 <main>
@@ -98,6 +104,11 @@ function qs(id){return document.getElementById(id);}
 /* Locations: Clare, Galway, Aran Islands + inland */
 const LOCS={
  "DOOLIN":       {name:"Doolin Port",        lat:53.016, lon:-9.4,   station:"Inishmore"},
+ "BALLYVAUGHAN": {name:"Ballyvaughan",       lat:53.120, lon:-9.150, station:"Galway_Port"},
+ "CARRAN":       {name:"Carran (Inland)",    lat:53.040, lon:-9.120, station:null},
+ "EAGLES_ROCK":  {name:"Eagle’s Rock",       lat:53.030, lon:-9.300, station:null},
+ "AILL_NA_SEARRACH": {name:"Aill na Searrach", lat:52.972, lon:-9.430, station:null},
+ "CLIFFS_CENTER":{name:"Cliffs of Moher Visitor Centre", lat:52.971, lon:-9.430, station:null},
  "FANORE":       {name:"Fanore",             lat:53.14,  lon:-9.28,  station:"Inishmore"},
  "QUILTY":       {name:"Quilty",             lat:52.82,  lon:-9.45,  station:"Kilrush"},
  "KILKEE":       {name:"Kilkee",             lat:52.678, lon:-9.644, station:"Kilrush"},
@@ -105,22 +116,23 @@ const LOCS={
  "SPANISH_PT":   {name:"Spanish Point",      lat:52.85,  lon:-9.42,  station:"Kilrush"},
  "WHITESTRAND":  {name:"Whitestrand",        lat:52.85,  lon:-9.42,  station:"Kilrush"},
  "KILRUSH":      {name:"Kilrush",            lat:52.64,  lon:-9.48,  station:"Kilrush"},
- "BALLYVAUGHAN": {name:"Ballyvaughan",       lat:53.120, lon:-9.150, station:"Galway_Port"},
  "KINVARA":      {name:"Kinvara",            lat:53.14,  lon:-8.93,  station:"Galway_Port"},
  "GALWAY":       {name:"Galway",             lat:53.27,  lon:-9.05,  station:"Galway_Port"},
  "INIS_MOR":     {name:"Inis Mór",           lat:53.11,  lon:-9.65,  station:"Inishmore"},
  "INIS_MEAIN":   {name:"Inis Meáin",         lat:53.08,  lon:-9.57,  station:"Inishmaan"},
- "INIS_OIRR":    {name:"Inis Oírr",          lat:53.06,  lon:-9.51,  station:"Inisheer"},
- "CARRAN":       {name:"Carran (Inland)",    lat:53.040, lon:-9.120, station:null},
- "EAGLES_ROCK":  {name:"Eagle’s Rock",       lat:53.030, lon:-9.300, station:null},
- "AILL_NA_SEARRACH": {name:"Aill na Searrach", lat:52.972, lon:-9.430, station:null},
- "CLIFFS_CENTER":{name:"Cliffs of Moher Visitor Centre", lat:52.971, lon:-9.430, station:null}
+ "INIS_OIRR":    {name:"Inis Oírr",          lat:53.06,  lon:-9.51,  station:"Inisheer"}
 };
 const sel=qs("locationSelect");
 for(const k in LOCS){const o=document.createElement("option");o.value=k;o.textContent=LOCS[k].name;if(k==="DOOLIN")o.selected=true;sel.appendChild(o);}
 let CUR=LOCS["DOOLIN"];
 sel.onchange=()=>{CUR=LOCS[sel.value];updateAll();};
-function setCurrent(loc){CUR=LOCS[loc];qs("locName").textContent=CUR.name;qs("latlon").textContent="Lat: "+CUR.lat.toFixed(3)+", Lon: "+CUR.lon.toFixed(3);}
+
+function setCurrent(loc){
+  CUR=LOCS[loc];
+  qs("locName").textContent=CUR.name;
+  qs("latlon").textContent="Lat: "+CUR.lat.toFixed(3)+", Lon: "+CUR.lon.toFixed(3);
+  qs("mapImg").src=`https://staticmap.openstreetmap.de/staticmap.php?center=${CUR.lat},${CUR.lon}&zoom=11&size=320x200&maptype=mapnik&markers=${CUR.lat},${CUR.lon},red-pushpin`;
+}
 
 /* Clock */
 setInterval(()=>{qs("clock").textContent="Current time: "+new Date().toLocaleTimeString("en-IE",{hour12:false});},1000);
@@ -152,7 +164,7 @@ function loadTide(){
     qs("tideChart").textContent="⚠️ No tide station available for this inland location.";
     qs("nextTide").textContent="";qs("tideSource").textContent="";return;
   }
-  const u=`https://erddap.marine.ie/erddap/tabledap/TidePrediction.json?station_id,time,sea_surface_height&station_id=${encodeURIComponent(CUR.station)}&orderBy(%22time%22)`;
+  const u=`https://erddap.marine.ie/erddap/tabledap/IMI_TidePrediction.json?stationID,time,Prediction&stationID=${encodeURIComponent(CUR.station)}&orderBy(%22time%22)`;
   fetch(u).then(r=>r.text()).then(txt=>{
     try{
       const j=JSON.parse(txt);
@@ -161,13 +173,30 @@ function loadTide(){
       const now=new Date();
       const future=rows.filter(r=>new Date(r[1])>=now).slice(0,6);
       if(!future.length){qs("tideChart").textContent="⚠️ No upcoming tide predictions.";qs("nextTide").textContent="";return;}
+      const heights=future.map(r=>parseFloat(r[2]));
+      const maxH=Math.max(...heights), minH=Math.min(...heights);
+      const highRow=future[heights.indexOf(maxH)];
+      const lowRow=future[heights.indexOf(minH)];
+
       const bars=future.map(r=>{
         const t=new Date(r[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
-        const h=parseFloat(r[2]);return `<div class="bar" style="height:${h*40}px;background:${tideColor(h)}"><span>${t}<br>${h.toFixed(2)}m</span></div>`;
+        const h=parseFloat(r[2]);
+        const isHigh=(h===maxH); const isLow=(h===minH);
+        const icon=isHigh?"🌊":isLow?"⬇️":"";
+        return `<div class="bar" style="height:${h*40}px;background:${tideColor(h)}">
+                  <div style="font-size:1.4rem">${icon}</div>
+                  <span>${t}<br>${h.toFixed(2)}m</span>
+                </div>`;
       }).join("");
       qs("tideChart").innerHTML=bars;
+
+      const highTime=new Date(highRow[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
+      const lowTime=new Date(lowRow[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
+      qs("nextTide").innerHTML=
+        `<b>Next High Tide:</b> ${highTime} — ${maxH.toFixed(2)} m 🌊<br>`+
+        `<b>Next Low Tide:</b> ${lowTime} — ${minH.toFixed(2)} m ⬇️`;
+
       qs("tideSource").textContent=`Source: ${CUR.station}`;
-      qs("nextTide").textContent=`Next tide shown among predictions`;
     }catch(e){qs("tideChart").textContent="Tide error";log("Tide raw: "+txt.slice(0,200));}
   }).catch(e=>{qs("tideChart").textContent="Tide error";log("Tide fetch err "+e);});
 }
