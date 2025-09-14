@@ -1,121 +1,193 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Doolin CG Call-out Operations</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Doolin IRCG — Live Ops Dashboard</title>
 <style>
-  body {
-    margin: 0;
-    background: url('background.jpeg') no-repeat center center fixed;
-    background-size: cover;
-    font-family: Arial, sans-serif;
-    color: #fff;
-    text-align: center;
+  :root{
+    --bg-overlay: rgba(0,0,0,0.76);
+    --accent: #2aa3ff;
+    --white: #fff;
+    --warn-yellow: #ffd54d;
+    --rnli-orange: #ff9800;
+    --dot-green: #66bb6a;
   }
-  header {
-    background: rgba(0,0,0,0.6);
-    padding: 15px;
-  }
-  h1 { margin: 0; font-size: 2rem; }
-  #infoBar {
-    background: rgba(0,0,0,0.7);
-    padding: 10px;
-    font-size: 1.2rem;
-    margin-bottom: 20px;
-  }
-  #weatherBox {
-    background: rgba(0,0,0,0.65);
-    margin: 20px auto;
-    padding: 20px;
-    border-radius: 12px;
-    max-width: 500px;
-    font-size: 1.2rem;
-  }
-  select {
-    padding: 6px;
-    font-size: 1rem;
-    border-radius: 6px;
-    border: 1px solid #444;
-    background: #111;
-    color: #fff;
-  }
+  body{margin:0;font-family:Segoe UI,Arial,sans-serif;background:#0b0b0b url('background.jpg') center/cover no-repeat fixed;color:var(--white);display:flex;flex-direction:column}
+  header{padding:12px;background:rgba(0,0,0,0.65)}
+  h1{margin:0;font-size:2.2rem;text-align:center}
+  #warningBanner{display:none;padding:14px;margin-top:10px;border-radius:8px;color:#111;font-weight:800;text-align:center}
+  #infoBar{position:sticky;top:0;z-index:1000;background:var(--bg-overlay);display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-bottom:3px solid var(--accent)}
+  #infoBar .left{font-size:1.3rem}
+  #infoBar .right{display:flex;align-items:center;gap:16px;font-size:1.2rem}
+  #locationSelect{padding:10px;border-radius:8px;background:rgba(255,255,255,0.07);color:var(--white);border:1px solid rgba(255,255,255,0.2)}
+  main{flex:1;display:flex;gap:24px;padding:18px}
+  .panel{flex:1;background:rgba(0,0,0,0.7);padding:20px;border-radius:14px;display:flex;flex-direction:column}
+  h2{text-align:center;font-size:1.6rem;margin:0 0 12px}
+  #weatherIconSvg{width:100px;height:100px}
+  .forecastHours{display:flex;gap:12px;overflow:hidden;margin-top:12px}
+  .fh{min-width:100px;background:rgba(255,255,255,0.08);padding:10px;border-radius:10px;text-align:center}
+  /* Compass */
+  #compass{position:relative;width:100px;height:100px;border-radius:50%;border:3px solid rgba(255,255,255,0.25)}
+  #compassArrow{position:absolute;left:50%;top:50%;width:6px;height:42px;background:red;border-radius:3px;transform-origin:50% 85%;transform:translate(-50%,-50%) rotate(0deg)}
+  .compass-label{position:absolute;font-size:1rem;font-weight:800;opacity:.85}
+  .n{left:50%;top:-18px;transform:translateX(-50%);color:red}
+  .s{left:50%;bottom:-18px;transform:translateX(-50%)}
+  .e{right:-18px;top:50%;transform:translateY(-50%)}
+  .w{left:-18px;top:50%;transform:translateY(-50%)}
+  /* Tides */
+  #tideList{list-style:none;padding:0;margin:0;max-height:420px;overflow:auto}
+  #tideList li{padding:9px 0;border-bottom:1px dashed rgba(255,255,255,0.1);font-size:1.1rem}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:1rem}
+  .legend .box{display:inline-block;width:18px;height:18px;border-radius:4px;margin-right:6px}
+  /* SAR ticker */
+  #tickerWrap{position:fixed;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);padding:16px 20px;border-top:4px solid rgba(255,255,255,0.1);z-index:2000}
+  #ticker{height:74px;display:flex;align-items:center;overflow:hidden}
+  .tick{min-width:100%;opacity:0;transform:translateX(28px);transition:all .6s ease;padding:6px}
+  .tick.show{opacity:1;transform:translateX(0)}
+  .tick .title{font-weight:900;font-size:1.35rem}
+  .tick .meta{font-size:1.15rem;opacity:0.9}
+  .badge{font-weight:900;padding:2px 6px;border-radius:4px;margin-right:8px}
+  .badge.met{background:var(--warn-yellow);color:#000}
+  .badge.rnli{background:var(--rnli-orange);color:#000}
+  .badge.dot{background:var(--dot-green);color:#000}
+  footer{padding:12px;text-align:center;font-size:1.1rem;background:rgba(0,0,0,0.35)}
 </style>
 </head>
 <body>
-<header>
-  <h1>Doolin CG Call-out Operations</h1>
-</header>
+<header><h1>Doolin Irish Coast Guard — Live Ops Dashboard</h1><div id="warningBanner"></div></header>
 
 <div id="infoBar">
-  <label for="location">Location:</label>
-  <select id="location"></select>
-  <div id="locInfo">Lat: --, Lon: --</div>
-  <div id="clock">Current time: --:--:--</div>
+  <div class="left"><strong id="locName">Doolin Port</strong> — <span id="latlon">Lat: 53.016, Lon: -9.400</span> — <span id="dataFrom">Data from: --:--:--</span></div>
+  <div class="right">
+    <label for="locationSelect">Location:</label>
+    <select id="locationSelect"></select>
+    <div id="clock"><strong>Current time:</strong> --:--:--</div>
+  </div>
 </div>
 
-<div id="weatherBox">
-  <h2>Weather</h2>
-  <div id="weatherData">Loading...</div>
-</div>
+<main>
+  <section class="panel">
+    <h2>Weather</h2>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div style="display:flex;gap:16px;align-items:center">
+        <svg id="weatherIconSvg"></svg>
+        <div>
+          <div id="weatherNow" style="font-size:1.4rem;font-weight:900"></div>
+          <div id="weatherDesc"></div>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div id="weatherTime"></div>
+        <div style="display:flex;gap:14px;margin-top:10px;align-items:center">
+          <div id="compass">
+            <div class="compass-label n">N</div><div class="compass-label s">S</div>
+            <div class="compass-label e">E</div><div class="compass-label w">W</div>
+            <div id="compassArrow"></div>
+          </div>
+          <div id="windText" style="font-weight:800;font-size:1.2rem"></div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:14px"><div style="font-weight:900;margin-bottom:6px">Last hour + next 5 hours</div><div id="hourly" class="forecastHours"></div></div>
+  </section>
+
+  <section class="panel">
+    <h2>Tides</h2>
+    <div id="tideSummary" style="font-weight:900;margin-bottom:10px">Loading…</div>
+    <ul id="tideList"></ul>
+    <div class="legend">
+      <div><span class="box" style="background:red"></span>Low</div>
+      <div><span class="box" style="background:orange"></span>Caution</div>
+      <div><span class="box" style="background:limegreen"></span>Good</div>
+      <div><span class="box" style="background:deepskyblue"></span>Very High</div>
+    </div>
+  </section>
+</main>
+
+<div id="tickerWrap"><div id="ticker"></div></div>
+<footer><span id="latestData">Latest data as of: --</span></footer>
 
 <script>
+/* Location mapping */
 const LOCS = {
- "DOOLIN": {name:"Doolin Port", lat:53.016, lon:-9.400},
- "CLIFFS": {name:"Cliffs of Moher", lat:52.971, lon:-9.430},
- "GALWAY": {name:"Galway", lat:53.270, lon:-9.050},
- "KILKEE": {name:"Kilkee", lat:52.678, lon:-9.644}
+ "DOOLIN":{name:"Doolin Port",lat:53.016,lon:-9.4,station:"Inishmore"},
+ "FANORE":{name:"Fanore",lat:53.14,lon:-9.28,station:"Inishmore"},
+ "LAHINCH":{name:"Lahinch",lat:52.933,lon:-9.35,station:"Galway_Port"},
+ "KINVARA":{name:"Kinvara",lat:53.14,lon:-8.93,station:"Galway_Port"},
+ "GALWAY":{name:"Galway",lat:53.27,lon:-9.05,station:"Galway_Port"},
+ "SPANISH_POINT":{name:"Spanish Point",lat:52.85,lon:-9.42,station:"Kilrush"},
+ "QUILTY":{name:"Quilty",lat:52.82,lon:-9.45,station:"Kilrush"},
+ "WHITESTRAND":{name:"Whitestrand",lat:52.85,lon:-9.42,station:"Kilrush"},
+ "KILKEE":{name:"Kilkee",lat:52.678,lon:-9.644,station:"Kilrush"},
+ "KILRUSH":{name:"Kilrush",lat:52.64,lon:-9.48,station:"Kilrush"},
+ "TRALEE":{name:"Tralee",lat:52.27,lon:-9.7,station:"Fenit"},
+ "DINGLE":{name:"Dingle",lat:52.14,lon:-10.27,station:"Dingle_Harbour"},
+ "INIS_MOR":{name:"Inis Mór",lat:53.11,lon:-9.65,station:"Inishmore"},
+ "INIS_MEAIN":{name:"Inis Meáin",lat:53.08,lon:-9.57,station:"Inishmaan"},
+ "INIS_OIRR":{name:"Inis Oírr",lat:53.06,lon:-9.51,station:"Inisheer"}
 };
+const DEFAULT="DOOLIN";
 
-let CUR = LOCS["DOOLIN"];
+/* Ticker sources */
+const MET_WARN_RSS = "https://www.met.ie/warningsxml/rss.xml";
+const RNLI_RSS = "https://rnli.org/news-and-media/rss-feeds/latest-news";
+const DOT_WORKER = "https://YOUR_WORKER_URL.workers.dev/?limit=10"; // set your Worker URL
 
-function populateSelect(){
-  const sel=document.getElementById('location');
-  for(const k in LOCS){
-    const o=document.createElement('option');
-    o.value=k; o.textContent=LOCS[k].name;
-    sel.appendChild(o);
-  }
-  sel.value="DOOLIN";
-}
-populateSelect();
+/* init dropdown */
+const sel=document.getElementById("locationSelect");
+for(const [id,loc] of Object.entries(LOCS)){const o=document.createElement("option");o.value=id;o.textContent=loc.name;if(id===DEFAULT)o.selected=true;sel.appendChild(o);}
+let CUR=LOCS[DEFAULT];
+sel.onchange=()=>{CUR=LOCS[sel.value];document.getElementById("locName").textContent=CUR.name;document.getElementById("latlon").textContent=`Lat: ${CUR.lat}, Lon: ${CUR.lon}`;updateAll();};
 
-function updateInfo(){
-  document.getElementById('locInfo').textContent =
-    `Lat: ${CUR.lat.toFixed(3)}, Lon: ${CUR.lon.toFixed(3)}`;
+/* Clock */
+function tick(){const t=new Date().toLocaleTimeString('en-IE',{hour12:false});document.getElementById("clock").innerHTML=`<strong>Current time:</strong> ${t}`;}
+setInterval(tick,1000);tick();
+
+/* Weather (simplified) */
+async function fetchWeather(){const url=`https://api.open-meteo.com/v1/forecast?latitude=${CUR.lat}&longitude=${CUR.lon}&current_weather=true&hourly=temperature_2m,weathercode&timezone=Europe/Dublin`;return (await fetch(url)).json();}
+function compassDir(d){const dirs=["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];return dirs[Math.round(d/22.5)%16];}
+function renderWeather(j){if(!j.current_weather)return;const w=j.current_weather;document.getElementById("weatherNow").textContent=`${w.temperature}°C`;document.getElementById("weatherTime").textContent=w.time;const d=w.winddirection;document.getElementById("windText").textContent=`${w.windspeed} km/h • ${Math.round(d)}° ${compassDir(d)}`;document.getElementById("compassArrow").style.transform=`translate(-50%,-50%) rotate(${d}deg)`;}
+
+/* Tides */
+async function fetchTides(){const now=new Date();const s=now.toISOString().split('.')[0]+"Z";const e=new Date(now.getTime()+6*3600e3).toISOString().split('.')[0]+"Z";const url=`https://erddap.marine.ie/erddap/tabledap/TidePrediction.json?station_id,sea_surface_height,time&station_id=${CUR.station}&time>=${s}&time<=${e}`;return (await fetch(url)).json();}
+function renderTides(j){const ul=document.getElementById("tideList");ul.innerHTML="";if(!j.table?.rows?.length){document.getElementById("tideSummary").textContent="No tide data";return;}j.table.rows.forEach(r=>{const t=new Date(r[2]).toLocaleTimeString('en-IE',{hour:'2-digit',minute:'2-digit'});const h=+r[1];const li=document.createElement("li");li.style.color=h<0.5?"red":h<1.5?"orange":h<3?"limegreen":"deepskyblue";li.textContent=`${t} — ${h.toFixed(2)} m`;ul.appendChild(li);});document.getElementById("tideSummary").textContent=`${j.table.rows.length} forecast points`;}
+
+/* Feeds */
+async function fetchWarnings(){try{const r=await fetch(MET_WARN_RSS);const xml=new DOMParser().parseFromString(await r.text(),"text/xml");const items=[...xml.querySelectorAll("item")];return items.map(x=>({title:x.querySelector("title")?.textContent||"",source:"Met Éireann",time:new Date().toLocaleTimeString('en-IE',{hour12:false})}));}catch{return[]}}
+async function fetchRNLI(){try{const r=await fetch("https://api.rss2json.com/v1/api.json?rss_url="+encodeURIComponent(RNLI_RSS));const j=await r.json();return j.items.map(x=>({title:x.title,source:"RNLI",time:new Date(x.pubDate).toLocaleTimeString('en-IE',{hour12:false})}));}catch{return[]}}
+async function fetchDoT(){if(!DOT_WORKER)return[];try{const r=await fetch(DOT_WORKER);const arr=await r.json();return arr.map(x=>({title:x.title,source:"DoT Marine Notices",time:new Date(x.pubDate).toLocaleTimeString('en-IE',{hour12:false})}));}catch{return[]}}
+
+/* Ticker */
+function renderTicker(items){
+  const box=document.getElementById("ticker");box.innerHTML="";
+  if(!items.length){box.textContent="No current official headlines";return;}
+  items.forEach(m=>{
+    const d=document.createElement("div");d.className="tick";
+    let badgeClass="";let badgeText="";
+    if(m.source.includes("Met")){badgeClass="met";badgeText="[Met]";}
+    else if(m.source.includes("RNLI")){badgeClass="rnli";badgeText="[RNLI]";}
+    else if(m.source.includes("DoT")){badgeClass="dot";badgeText="[DoT]";}
+    d.innerHTML=`
+      <span class="badge ${badgeClass}">${badgeText}</span>
+      <span class="title">${m.title}</span>
+      <div class="meta">${m.source} • ${m.time}</div>
+    `;
+    box.appendChild(d);
+  });
+  let i=0;const t=box.querySelectorAll(".tick");t[0].classList.add("show");
+  setInterval(()=>{t[i].classList.remove("show");i=(i+1)%t.length;t[i].classList.add("show");},10000);
 }
-function startClock(){
-  setInterval(()=>{
-    document.getElementById('clock').textContent =
-      "Current time: " + new Date().toLocaleTimeString("en-IE",{hour12:false});
-  },1000);
+
+/* Update all */
+async function updateAll(){
+  document.getElementById("dataFrom").textContent="Data from: "+new Date().toLocaleTimeString('en-IE',{hour12:false});
+  const [w,t,warn,rnli,dot]=await Promise.all([fetchWeather(),fetchTides(),fetchWarnings(),fetchRNLI(),fetchDoT()]);
+  renderWeather(w);renderTides(t);
+  const news=[...warn,...rnli,...dot].filter(x=>x.title);renderTicker(news);
+  document.getElementById("latestData").textContent="Latest data as of: "+new Date().toLocaleTimeString('en-IE',{hour12:false});
 }
-async function loadWeather(){
-  const url=`https://api.open-meteo.com/v1/forecast?latitude=${CUR.lat}&longitude=${CUR.lon}&current_weather=true&timezone=Europe%2FDublin&_ts=${Date.now()}`;
-  try{
-    const r=await fetch(url,{cache:"no-store"});
-    const j=await r.json();
-    const c=j.current_weather;
-    document.getElementById('weatherData').innerHTML=
-      `<b>${c.temperature} °C</b><br>
-       Wind: ${c.windspeed} km/h (dir ${c.winddirection}°)<br>
-       Time: ${c.time}`;
-  }catch(e){
-    document.getElementById('weatherData').textContent="⚠️ Weather fetch failed";
-    console.error("Weather error",e);
-  }
-}
-function updateAll(){
-  updateInfo();
-  loadWeather();
-}
-document.getElementById('location').onchange=e=>{
-  CUR=LOCS[e.target.value];
-  updateAll();
-};
-startClock();
-updateAll();
-setInterval(updateAll,60000);
+updateAll();setInterval(updateAll,60000);
 </script>
 </body>
 </html>
