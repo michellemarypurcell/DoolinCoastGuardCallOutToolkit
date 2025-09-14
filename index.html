@@ -37,7 +37,9 @@
   #tideChart{height:160px;display:flex;align-items:flex-end;gap:8px;justify-content:center;margin-top:12px}
   .bar{flex:1;min-width:40px;text-align:center;color:#fff;font-size:0.9rem;font-weight:600;border-radius:6px 6px 0 0;display:flex;flex-direction:column;justify-content:flex-end}
   .bar span{background:rgba(0,0,0,0.4);width:100%;padding:2px;border-radius:0 0 6px 6px}
-  #nextTide{margin-top:10px;text-align:center;font-weight:700;color:#fff;font-size:1.2rem}
+  #nextTide{margin-top:10px;text-align:center;font-weight:700;font-size:1.3rem;line-height:1.6}
+  #nextTide .high{color:deepskyblue}
+  #nextTide .low{color:red}
   #tideSource{text-align:center;margin-top:6px;font-size:0.9rem;color:#aaa}
   footer{text-align:center;padding:12px;background:#111;color:#ddd;font-size:1.1rem}
   #debug{display:none}
@@ -193,8 +195,8 @@ function loadTide(){
       const highTime=new Date(highRow[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
       const lowTime=new Date(lowRow[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
       qs("nextTide").innerHTML=
-        `<b>Next High Tide:</b> ${highTime} — ${maxH.toFixed(2)} m 🌊<br>`+
-        `<b>Next Low Tide:</b> ${lowTime} — ${minH.toFixed(2)} m ⬇️`;
+        `<span class="high"><b>Next High Tide:</b> ${highTime} — ${maxH.toFixed(2)} m 🌊</span><br>`+
+        `<span class="low"><b>Next Low Tide:</b> ${lowTime} — ${minH.toFixed(2)} m ⬇️</span>`;
 
       qs("tideSource").textContent=`Source: ${CUR.station}`;
     }catch(e){qs("tideChart").textContent="Tide error";log("Tide raw: "+txt.slice(0,200));}
