@@ -103,7 +103,7 @@
 function log(m){const d=document.getElementById('debug');d.textContent+=m+"\\n";d.scrollTop=d.scrollHeight;}
 function qs(id){return document.getElementById(id);}
 
-/* Locations with correct tide station IDs */
+/* Locations */
 const LOCS={
  "DOOLIN":       {name:"Doolin Port", lat:53.016, lon:-9.4,   station:"Inishmore"},
  "BALLYVAUGHAN": {name:"Ballyvaughan", lat:53.120, lon:-9.150, station:"Galway_Port"},
@@ -133,7 +133,7 @@ function setCurrent(loc){
   CUR=LOCS[loc];
   qs("locName").textContent=CUR.name;
   qs("latlon").textContent="Lat: "+CUR.lat.toFixed(3)+", Lon: "+CUR.lon.toFixed(3);
-  qs("mapImg").src=`https://maps.wikimedia.org/img/osm-intl,11,${CUR.lat},${CUR.lon},320x200.png`;
+  qs("mapImg").src=`https://staticmap.openstreetmap.de/staticmap.php?center=${CUR.lat},${CUR.lon}&zoom=11&size=320x200&maptype=mapnik&markers=${CUR.lat},${CUR.lon},red-pushpin`;
 }
 
 /* Clock */
@@ -154,7 +154,7 @@ function loadWeather(){
   }).catch(e=>{qs("weatherData").textContent="Weather error";log("Weather error "+e);});
 }
 
-/* Tides */
+/* Tides via AllOrigins proxy */
 function tideColor(h){
   if(h<0.5) return "red";
   if(h<1.5) return "orange";
@@ -168,13 +168,11 @@ async function loadTide(){
   }
   const nowISO = new Date().toISOString();
   const url = `https://erddap.marine.ie/erddap/tabledap/IMI_TidePrediction.json?stationID,time,Prediction&stationID=${encodeURIComponent(CUR.station)}&time>=${nowISO}`;
+  const proxiedUrl = "https://api.allorigins.win/get?url=" + encodeURIComponent(url);
   try {
-    const r = await fetch(url);
-    const ct = r.headers.get("content-type") || "";
-    if (!ct.includes("application/json")) {
-      throw new Error("Marine Institute tide server unavailable (non-JSON response)");
-    }
-    const j = await r.json();
+    const r = await fetch(proxiedUrl);
+    const data = await r.json();
+    const j = JSON.parse(data.contents);
     const rows = j.table?.rows || [];
     if (!rows.length) {
       qs("tideChart").textContent=`⚠️ No tide predictions found for ${CUR.station}`;
@@ -214,7 +212,7 @@ async function loadTide(){
       `<span class="low"><b>Next Low Tide:</b> ${lowTime} — ${minH.toFixed(2)} m ⬇️</span>`;
     qs("tideSource").textContent=`Source: ${CUR.station}`;
   } catch(e) {
-    qs("tideChart").textContent="⚠️ Marine Institute tide server unavailable";
+    qs("tideChart").textContent="⚠️ Tide data unavailable (proxy or server error)";
     log("Tide fetch error: "+e.message);
   }
 }
