@@ -126,7 +126,6 @@ function loadWeather(){
 }
 
 /* Tides */
-function isoNoMs(d){return d.toISOString().split('.')[0]+"Z";}
 function tideColor(h){
   if(h<0.5) return "red";
   if(h<1.5) return "orange";
@@ -134,9 +133,7 @@ function tideColor(h){
   return "deepskyblue";
 }
 function loadTide(){
-  const start=new Date(Date.now()-3600*1000); // 1h back
-  const end=new Date(Date.now()+12*3600*1000); // 12h forward
-  const u=`https://erddap.marine.ie/erddap/tabledap/TidePrediction.json?station_id,time,sea_surface_height&station_id=${encodeURIComponent(CUR.station)}&time>=${isoNoMs(start)}&time<=${isoNoMs(end)}`;
+  const u=`https://erddap.marine.ie/erddap/tabledap/TidePrediction.json?station_id,time,sea_surface_height&station_id=${encodeURIComponent(CUR.station)}&orderBy(%22time%22)`;
   fetch(u).then(r=>r.json()).then(j=>{
     const rows=j.table?.rows||[];
     if(!rows.length){
@@ -144,24 +141,28 @@ function loadTide(){
       return;
     }
 
-    const limited=rows.slice(0,6);
-    const heights=limited.map(r=>parseFloat(r[2]));
+    const now=new Date();
+    const future=rows.filter(r=>new Date(r[1])>=now).slice(0,6);
+
+    if(!future.length){
+      qs("tideData").innerHTML="⚠️ No upcoming tide predictions.";
+      qs("nextTide").textContent="";
+      return;
+    }
+
+    const heights=future.map(r=>parseFloat(r[2]));
     const minH=Math.min(...heights);
     const maxH=Math.max(...heights);
 
-    const now=new Date();
-    let nextIdx=-1;
-    let nextLabel="";
-    limited.forEach((r,i)=>{
-      const t=new Date(r[1]);
+    let nextIdx=-1, nextLabel="";
+    future.forEach((r,i)=>{
       const h=parseFloat(r[2]);
-      if(t>now && (h===minH||h===maxH) && nextIdx===-1){
-        nextIdx=i;
-        nextLabel=h===minH?"Low Tide":"High Tide";
+      if((h===minH||h===maxH) && nextIdx===-1){
+        nextIdx=i; nextLabel=h===minH?"Low Tide":"High Tide";
       }
     });
 
-    const list=limited.map((r,i)=>{
+    const list=future.map((r,i)=>{
       const t=new Date(r[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
       const h=parseFloat(r[2]);
       let style=`color:${tideColor(h)};`;
@@ -175,7 +176,7 @@ function loadTide(){
     qs("tideData").innerHTML=`<h3>Next 6 hours</h3><ul>${list}</ul>`;
 
     if(nextIdx>-1){
-      const t=new Date(limited[nextIdx][1]);
+      const t=new Date(future[nextIdx][1]);
       const diff=(t-now)/1000;
       const h=Math.floor(diff/3600);
       const m=Math.floor((diff%3600)/60);
