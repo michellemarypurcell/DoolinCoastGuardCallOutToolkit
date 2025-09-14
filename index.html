@@ -161,53 +161,62 @@ function tideColor(h){
   if(h<=3.0) return "limegreen";
   return "deepskyblue";
 }
-function loadTide(){
+async function loadTide(){
   if(!CUR.station){
     qs("tideChart").textContent="⚠️ No tide station available for this inland location.";
     qs("nextTide").textContent="";qs("tideSource").textContent="";return;
   }
-  const u=`https://erddap.marine.ie/erddap/tabledap/IMI_TidePrediction.json?stationID,time,Prediction&stationID=${encodeURIComponent(CUR.station)}&orderBy(%22time%22)`;
-  fetch(u).then(r=>r.text()).then(txt=>{
-    try{
-      const j=JSON.parse(txt);
-      const rows=j.table?.rows||[];
-      if(!rows.length){qs("tideChart").textContent=`⚠️ No tide data for ${CUR.station}`;return;}
-      const now=new Date();
-      const future=rows.filter(r=>new Date(r[1])>=now).slice(0,6);
-      if(!future.length){qs("tideChart").textContent="⚠️ No upcoming tide predictions.";qs("nextTide").textContent="";return;}
-      const heights=future.map(r=>parseFloat(r[2]));
-      const maxH=Math.max(...heights), minH=Math.min(...heights);
-      const highRow=future[heights.indexOf(maxH)];
-      const lowRow=future[heights.indexOf(minH)];
-
-      const bars=future.map((r,i)=>{
-        const t=new Date(r[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
-        const h=parseFloat(r[2]);
-        const isHigh=(h===maxH); const isLow=(h===minH);
-        const icon=isHigh?"🌊":isLow?"⬇️":"";
-        // Trend shading
-        let trend="", bgColor=tideColor(h);
-        if(i<future.length-1){
-          const nextH=parseFloat(future[i+1][2]);
-          if(nextH>h){ trend="⬆️"; bgColor=`linear-gradient(to top, deepskyblue, ${tideColor(h)})`; }
-          else if(nextH<h){ trend="⬇️"; bgColor=`linear-gradient(to top, #555, ${tideColor(h)})`; }
-        }
-        return `<div class="bar" style="height:${h*40}px;background:${bgColor}">
-                  <div style="font-size:1.4rem">${icon}</div>
-                  <span>${t}<br>${h.toFixed(2)}m ${trend}</span>
-                </div>`;
-      }).join("");
-      qs("tideChart").innerHTML=bars;
-
-      const highTime=new Date(highRow[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
-      const lowTime=new Date(lowRow[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
-      qs("nextTide").innerHTML=
-        `<span class="high"><b>Next High Tide:</b> ${highTime} — ${maxH.toFixed(2)} m 🌊</span><br>`+
-        `<span class="low"><b>Next Low Tide:</b> ${lowTime} — ${minH.toFixed(2)} m ⬇️</span>`;
-
-      qs("tideSource").textContent=`Source: ${CUR.station}`;
-    }catch(e){qs("tideChart").textContent="Tide error";log("Tide raw: "+txt.slice(0,200));}
-  }).catch(e=>{qs("tideChart").textContent="Tide error";log("Tide fetch err "+e);});
+  const nowISO = new Date().toISOString();
+  const url = `https://erddap.marine.ie/erddap/tabledap/IMI_TidePrediction.json?stationID,time,Prediction&stationID=${encodeURIComponent(CUR.station)}&time>=${nowISO}`;
+  try {
+    const r = await fetch(url);
+    const ct = r.headers.get("content-type") || "";
+    if (!ct.includes("application/json")) {
+      throw new Error("Marine Institute tide server unavailable (non-JSON response)");
+    }
+    const j = await r.json();
+    const rows = j.table?.rows || [];
+    if (!rows.length) {
+      qs("tideChart").textContent=`⚠️ No tide predictions found for ${CUR.station}`;
+      return;
+    }
+    const now = new Date();
+    const future = rows.filter(r=>new Date(r[1])>=now).slice(0,6);
+    if (!future.length) {
+      qs("tideChart").textContent="⚠️ No upcoming tide predictions.";
+      return;
+    }
+    const heights=future.map(r=>parseFloat(r[2]));
+    const maxH=Math.max(...heights), minH=Math.min(...heights);
+    const highRow=future[heights.indexOf(maxH)];
+    const lowRow=future[heights.indexOf(minH)];
+    const bars=future.map((r,i)=>{
+      const t=new Date(r[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
+      const h=parseFloat(r[2]);
+      const isHigh=(h===maxH); const isLow=(h===minH);
+      const icon=isHigh?"🌊":isLow?"⬇️":"";
+      let trend="", bgColor=tideColor(h);
+      if(i<future.length-1){
+        const nextH=parseFloat(future[i+1][2]);
+        if(nextH>h){ trend="⬆️"; bgColor=`linear-gradient(to top, deepskyblue, ${tideColor(h)})`; }
+        else if(nextH<h){ trend="⬇️"; bgColor=`linear-gradient(to top, #555, ${tideColor(h)})`; }
+      }
+      return `<div class="bar" style="height:${h*40}px;background:${bgColor}">
+                <div style="font-size:1.4rem">${icon}</div>
+                <span>${t}<br>${h.toFixed(2)}m ${trend}</span>
+              </div>`;
+    }).join("");
+    qs("tideChart").innerHTML=bars;
+    const highTime=new Date(highRow[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
+    const lowTime=new Date(lowRow[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
+    qs("nextTide").innerHTML=
+      `<span class="high"><b>Next High Tide:</b> ${highTime} — ${maxH.toFixed(2)} m 🌊</span><br>`+
+      `<span class="low"><b>Next Low Tide:</b> ${lowTime} — ${minH.toFixed(2)} m ⬇️</span>`;
+    qs("tideSource").textContent=`Source: ${CUR.station}`;
+  } catch(e) {
+    qs("tideChart").textContent="⚠️ Marine Institute tide server unavailable";
+    log("Tide fetch error: "+e.message);
+  }
 }
 
 /* Refresh */
