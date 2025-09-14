@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Doolin CG Call-out Operations</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <style>
   body{margin:0;background:#0b0b0b;color:#fff;font-family:Segoe UI,Arial,sans-serif;overflow:hidden}
   header{padding:16px;background:#111;text-align:center;border-bottom:3px solid #2aa3ff}
@@ -16,11 +17,12 @@
   #locName{font-weight:800}
   #latlon{color:#ddd}
   #locationSelect{background:#0f0f0f;color:#fff;border:1px solid #333;padding:6px;border-radius:8px}
-  #mapBox{text-align:center;margin:10px 0}
-  #mapImg{border-radius:8px;border:2px solid #333}
+  #mapBox{margin:10px}
+  #map{height:200px;border-radius:8px;border:2px solid #333}
   main{display:flex;gap:20px;padding:16px;height:calc(100vh - 280px);box-sizing:border-box}
   .panel{flex:1 1 50%;background:#1c1c1c;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:center}
   .panel h2{text-align:center;margin:0 0 14px;font-size:1.6rem}
+  .status-dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-left:6px;background:#666}
   /* Weather visuals */
   #weatherIcon{font-size:4.5rem;text-align:center;margin-bottom:10px}
   #weatherData{font-size:1.4rem;text-align:center;line-height:1.6}
@@ -67,13 +69,11 @@
   </div>
 </div>
 
-<div id="mapBox">
-  <img id="mapImg" src="" alt="Location map" width="320" height="200">
-</div>
+<div id="mapBox"><div id="map"></div></div>
 
 <main>
   <section class="panel">
-    <h2>Weather</h2>
+    <h2>Weather <span id="weatherStatus" class="status-dot"></span></h2>
     <div id="weatherIcon">☀️</div>
     <div id="weatherData">Loading…</div>
     <div id="compass">
@@ -86,7 +86,7 @@
     <div id="windText"></div>
   </section>
   <section class="panel">
-    <h2>Tide Forecast</h2>
+    <h2>Tide Forecast <span id="tideStatus" class="status-dot"></span></h2>
     <div id="tideChart">Loading…</div>
     <div id="nextTide"></div>
     <div id="tideSource"></div>
@@ -99,6 +99,7 @@
 
 <pre id="debug"></pre>
 
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script>
 function log(m){const d=document.getElementById('debug');d.textContent+=m+"\\n";d.scrollTop=d.scrollHeight;}
 function qs(id){return document.getElementById(id);}
@@ -129,11 +130,19 @@ for(const k in LOCS){const o=document.createElement("option");o.value=k;o.textCo
 let CUR=LOCS["DOOLIN"];
 sel.onchange=()=>{CUR=LOCS[sel.value];updateAll();};
 
+let map, marker;
 function setCurrent(loc){
   CUR=LOCS[loc];
   qs("locName").textContent=CUR.name;
   qs("latlon").textContent="Lat: "+CUR.lat.toFixed(3)+", Lon: "+CUR.lon.toFixed(3);
-  qs("mapImg").src=`https://staticmap.openstreetmap.de/staticmap.php?center=${CUR.lat},${CUR.lon}&zoom=11&size=320x200&maptype=mapnik&markers=${CUR.lat},${CUR.lon},red-pushpin`;
+  if(!map){
+    map=L.map('map').setView([CUR.lat,CUR.lon],11);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OSM'}).addTo(map);
+    marker=L.marker([CUR.lat,CUR.lon]).addTo(map);
+  } else {
+    map.setView([CUR.lat,CUR.lon],11);
+    marker.setLatLng([CUR.lat,CUR.lon]);
+  }
 }
 
 /* Clock */
@@ -145,59 +154,45 @@ function iconForCode(c){if(c===0)return"☀️";if([1,2,3].includes(c))return"�
 function loadWeather(){
   const u=`https://api.open-meteo.com/v1/forecast?latitude=${CUR.lat}&longitude=${CUR.lon}&current=temperature_2m,wind_speed_10m,wind_direction_10m,weathercode&timezone=Europe%2FDublin`;
   fetch(u).then(r=>r.json()).then(j=>{
-    if(!j.current){qs("weatherData").textContent="No weather";return;}
+    if(!j.current){qs("weatherData").textContent="No weather";qs("weatherStatus").style.background="red";return;}
     const c=j.current;
     qs("weatherIcon").textContent=iconForCode(c.weathercode);
     qs("weatherData").innerHTML=`<b>${c.temperature_2m}°C</b><br>Wind: ${c.wind_speed_10m} km/h`;
     qs("compassArrow").style.transform=`translate(-50%,-50%) rotate(${c.wind_direction_10m}deg)`;
     qs("windText").textContent=`${c.wind_direction_10m}° ${compassDir(c.wind_direction_10m)}`;
-  }).catch(e=>{qs("weatherData").textContent="Weather error";log("Weather error "+e);});
+    qs("weatherStatus").style.background="green";
+  }).catch(e=>{qs("weatherData").textContent="Weather error";qs("weatherStatus").style.background="red";});
 }
 
-/* Tides via AllOrigins proxy */
-function tideColor(h){
-  if(h<0.5) return "red";
-  if(h<1.5) return "orange";
-  if(h<=3.0) return "limegreen";
-  return "deepskyblue";
-}
+/* Tides via thingproxy */
+function tideColor(h){if(h<0.5)return"red";if(h<1.5)return"orange";if(h<=3.0)return"limegreen";return"deepskyblue";}
 async function loadTide(){
-  if(!CUR.station){
-    qs("tideChart").textContent="⚠️ No tide station available for this inland location.";
-    qs("nextTide").textContent="";qs("tideSource").textContent="";return;
-  }
-  const nowISO = new Date().toISOString();
-  const url = `https://erddap.marine.ie/erddap/tabledap/IMI_TidePrediction.json?stationID,time,Prediction&stationID=${encodeURIComponent(CUR.station)}&time>=${nowISO}`;
-  const proxiedUrl = "https://api.allorigins.win/get?url=" + encodeURIComponent(url);
-  try {
-    const r = await fetch(proxiedUrl);
-    const data = await r.json();
-    const j = JSON.parse(data.contents);
-    const rows = j.table?.rows || [];
-    if (!rows.length) {
-      qs("tideChart").textContent=`⚠️ No tide predictions found for ${CUR.station}`;
-      return;
-    }
-    const now = new Date();
-    const future = rows.filter(r=>new Date(r[1])>=now).slice(0,6);
-    if (!future.length) {
-      qs("tideChart").textContent="⚠️ No upcoming tide predictions.";
-      return;
-    }
+  if(!CUR.station){qs("tideChart").textContent="⚠️ No tide station for this location.";qs("tideStatus").style.background="red";return;}
+  const nowISO=new Date().toISOString();
+  const url=`https://erddap.marine.ie/erddap/tabledap/IMI_TidePrediction.json?stationID,time,Prediction&stationID=${encodeURIComponent(CUR.station)}&time>=${nowISO}`;
+  const proxiedUrl="https://thingproxy.freeboard.io/fetch/"+url;
+  try{
+    const r=await fetch(proxiedUrl);
+    const j=await r.json();
+    const rows=j.table?.rows||[];
+    if(!rows.length){qs("tideChart").textContent=`⚠️ No tide predictions for ${CUR.station}`;qs("tideStatus").style.background="red";return;}
+    const now=new Date();
+    const future=rows.filter(r=>new Date(r[1])>=now).slice(0,6);
+    if(!future.length){qs("tideChart").textContent="⚠️ No upcoming tide predictions.";qs("tideStatus").style.background="red";return;}
     const heights=future.map(r=>parseFloat(r[2]));
-    const maxH=Math.max(...heights), minH=Math.min(...heights);
+    const maxH=Math.max(...heights),minH=Math.min(...heights);
     const highRow=future[heights.indexOf(maxH)];
     const lowRow=future[heights.indexOf(minH)];
     const bars=future.map((r,i)=>{
       const t=new Date(r[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
       const h=parseFloat(r[2]);
-      const isHigh=(h===maxH); const isLow=(h===minH);
+      const isHigh=(h===maxH),isLow=(h===minH);
       const icon=isHigh?"🌊":isLow?"⬇️":"";
-      let trend="", bgColor=tideColor(h);
+      let trend="",bgColor=tideColor(h);
       if(i<future.length-1){
         const nextH=parseFloat(future[i+1][2]);
-        if(nextH>h){ trend="⬆️"; bgColor=`linear-gradient(to top, deepskyblue, ${tideColor(h)})`; }
-        else if(nextH<h){ trend="⬇️"; bgColor=`linear-gradient(to top, #555, ${tideColor(h)})`; }
+        if(nextH>h){trend="⬆️";bgColor=`linear-gradient(to top, deepskyblue, ${tideColor(h)})`;}
+        else if(nextH<h){trend="⬇️";bgColor=`linear-gradient(to top, #555, ${tideColor(h)})`;}
       }
       return `<div class="bar" style="height:${h*40}px;background:${bgColor}">
                 <div style="font-size:1.4rem">${icon}</div>
@@ -207,14 +202,11 @@ async function loadTide(){
     qs("tideChart").innerHTML=bars;
     const highTime=new Date(highRow[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
     const lowTime=new Date(lowRow[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
-    qs("nextTide").innerHTML=
-      `<span class="high"><b>Next High Tide:</b> ${highTime} — ${maxH.toFixed(2)} m 🌊</span><br>`+
-      `<span class="low"><b>Next Low Tide:</b> ${lowTime} — ${minH.toFixed(2)} m ⬇️</span>`;
+    qs("nextTide").innerHTML=`<span class="high"><b>Next High Tide:</b> ${highTime} — ${maxH.toFixed(2)} m 🌊</span><br>
+                              <span class="low"><b>Next Low Tide:</b> ${lowTime} — ${minH.toFixed(2)} m ⬇️</span>`;
     qs("tideSource").textContent=`Source: ${CUR.station}`;
-  } catch(e) {
-    qs("tideChart").textContent="⚠️ Tide data unavailable (proxy or server error)";
-    log("Tide fetch error: "+e.message);
-  }
+    qs("tideStatus").style.background="green";
+  }catch(e){qs("tideChart").textContent="⚠️ Tide data unavailable";qs("tideStatus").style.background="red";}
 }
 
 /* Refresh */
