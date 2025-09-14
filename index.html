@@ -12,6 +12,9 @@
   #sarIncident{background:rgba(220,0,0,0.85);padding:14px;margin:10px;border-radius:10px;text-align:center}
   #sarIncident h2{margin:0 0 8px;font-size:1.4rem}
   #incidentDetails{font-size:1.2rem;font-weight:600}
+  #incidentAdmin{display:none;margin-top:10px;text-align:center}
+  #incidentAdmin input{padding:6px;margin:4px;border-radius:6px;border:1px solid #333}
+  #incidentAdmin button{padding:6px 12px;border:none;border-radius:6px;background:#2aa3ff;color:#fff;font-weight:600;cursor:pointer}
   #infoBar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;background:#141414;
     padding:10px;border-top:1px solid #222;border-bottom:1px solid #222}
   #locName{font-weight:800}
@@ -19,7 +22,12 @@
   #locationSelect{background:#0f0f0f;color:#fff;border:1px solid #333;padding:6px;border-radius:8px}
   #mapBox{margin:10px}
   #map{height:200px;border-radius:8px;border:2px solid #333}
-  main{display:flex;gap:20px;padding:16px;height:calc(100vh - 280px);box-sizing:border-box}
+  #warningsBox{margin:10px;text-align:center}
+  .warning{padding:10px;margin:8px auto;border-radius:8px;font-weight:600;max-width:900px}
+  .red{background:#b30000;color:#fff}
+  .orange{background:#ff6600;color:#fff}
+  .yellow{background:#ffcc00;color:#000}
+  main{display:flex;gap:20px;padding:16px;height:calc(100vh - 420px);box-sizing:border-box}
   .panel{flex:1 1 50%;background:#1c1c1c;border-radius:12px;padding:16px;display:flex;flex-direction:column;justify-content:center}
   .panel h2{text-align:center;margin:0 0 14px;font-size:1.6rem}
   .status-dot{display:inline-block;width:12px;height:12px;border-radius:50%;margin-left:6px;background:#666}
@@ -44,7 +52,7 @@
   #nextTide .low{color:red}
   #tideSource{text-align:center;margin-top:6px;font-size:0.9rem;color:#aaa}
   footer{text-align:center;padding:12px;background:#111;color:#ddd;font-size:1.1rem}
-  #debug{display:none}
+  #debug{display:none;background:#000;color:#0f0;padding:10px;max-height:150px;overflow:auto;font-size:0.8rem}
   @media(max-width:800px){
     main{flex-direction:column;height:auto}
     .panel{flex:1 1 auto}
@@ -58,6 +66,11 @@
 <section id="sarIncident">
   <h2>Latest Coast Guard Incident</h2>
   <div id="incidentDetails"><p>No active incident entered.</p></div>
+  <div id="incidentAdmin">
+    <input type="text" id="incidentTitle" placeholder="Incident Title"><br>
+    <input type="text" id="incidentDesc" placeholder="Incident Description / Location"><br>
+    <button onclick="saveIncident()">Save Incident</button>
+  </div>
 </section>
 
 <div id="infoBar">
@@ -70,6 +83,8 @@
 </div>
 
 <div id="mapBox"><div id="map"></div></div>
+
+<div id="warningsBox">Loading warnings…</div>
 
 <main>
   <section class="panel">
@@ -103,22 +118,27 @@
 <script>
 function qs(id){return document.getElementById(id);}
 
+/* Incident admin lock */
+function enableAdmin(){
+  const pw=prompt("Enter admin password:");
+  if(pw==="admin123"){qs("incidentAdmin").style.display="block";}
+  else{alert("Wrong password");}
+}
+function saveIncident(){
+  const title=qs("incidentTitle").value||"Untitled";
+  const desc=qs("incidentDesc").value||"";
+  qs("incidentDetails").innerHTML=`<b>${title}</b><br>${desc}`;
+}
+document.getElementById("sarIncident").ondblclick=enableAdmin;
+
 /* Locations */
 const LOCS={
- "DOOLIN":       {name:"Doolin Port", lat:53.016, lon:-9.4,   station:"Inishmore"},
- "BALLYVAUGHAN": {name:"Ballyvaughan", lat:53.120, lon:-9.150, station:"Galway_Port"},
- "FANORE":       {name:"Fanore", lat:53.14, lon:-9.28,  station:"Inishmore"},
- "QUILTY":       {name:"Quilty", lat:52.82, lon:-9.45,  station:"Kilrush"},
- "KILKEE":       {name:"Kilkee", lat:52.678, lon:-9.644, station:"Kilrush"},
- "LAHINCH":      {name:"Lahinch", lat:52.933, lon:-9.35, station:"Inishmore"},
- "SPANISH_PT":   {name:"Spanish Point", lat:52.85, lon:-9.42, station:"Kilrush"},
- "WHITESTRAND":  {name:"Whitestrand", lat:52.85, lon:-9.42, station:"Kilrush"},
- "KILRUSH":      {name:"Kilrush", lat:52.64, lon:-9.48, station:"Kilrush"},
- "KINVARA":      {name:"Kinvara", lat:53.14, lon:-8.93, station:"Galway_Port"},
- "GALWAY":       {name:"Galway", lat:53.27, lon:-9.05, station:"Galway_Port"},
- "INIS_MOR":     {name:"Inis Mór", lat:53.11, lon:-9.65, station:"Inishmore"},
- "INIS_MEAIN":   {name:"Inis Meáin", lat:53.08, lon:-9.57, station:"Inishmaan"},
- "INIS_OIRR":    {name:"Inis Oírr", lat:53.06, lon:-9.51, station:"Inisheer"}
+ "DOOLIN":{name:"Doolin Port", lat:53.016, lon:-9.4, station:"Inishmore"},
+ "BALLYVAUGHAN":{name:"Ballyvaughan", lat:53.120, lon:-9.150, station:"Galway_Port"},
+ "FANORE":{name:"Fanore", lat:53.14, lon:-9.28, station:"Inishmore"},
+ "KILKEE":{name:"Kilkee", lat:52.678, lon:-9.644, station:"Kilrush"},
+ "LAHINCH":{name:"Lahinch", lat:52.933, lon:-9.35, station:"Inishmore"},
+ "GALWAY":{name:"Galway", lat:53.27, lon:-9.05, station:"Galway_Port"}
 };
 const sel=qs("locationSelect");
 for(const k in LOCS){const o=document.createElement("option");o.value=k;o.textContent=LOCS[k].name;if(k==="DOOLIN")o.selected=true;sel.appendChild(o);}
@@ -159,50 +179,26 @@ function loadWeather(){
   }).catch(e=>{qs("weatherData").textContent="Weather error";qs("weatherStatus").style.background="red";});
 }
 
-/* Tides via thingproxy with status dot */
-function tideColor(h){if(h<0.5)return"red";if(h<1.5)return"orange";if(h<=3.0)return"limegreen";return"deepskyblue";}
-async function loadTide(){
-  if(!CUR.station){qs("tideChart").textContent="⚠️ No tide station";qs("tideStatus").style.background="red";return;}
-  const nowISO=new Date().toISOString();
-  const url=`https://erddap.marine.ie/erddap/tabledap/IMI_TidePrediction.json?stationID,time,Prediction&stationID=${encodeURIComponent(CUR.station)}&time>=${nowISO}`;
-  const proxiedUrl="https://thingproxy.freeboard.io/fetch/"+url;
+/* Met Éireann warnings */
+async function loadWarnings(){
+  const box=qs("warningsBox");
   try{
-    const r=await fetch(proxiedUrl);
-    const txt=await r.text();
-    let j;
-    try{ j=JSON.parse(txt); }catch(e){ qs("tideChart").textContent="⚠️ Tide server error"; qs("tideStatus").style.background="red"; return; }
-    const rows=j.table?.rows||[];
-    if(!rows.length){qs("tideChart").textContent=`⚠️ No tide predictions for ${CUR.station}`;qs("tideStatus").style.background="yellow";return;}
-    const now=new Date();
-    const future=rows.filter(r=>new Date(r[1])>=now).slice(0,6);
-    if(!future.length){qs("tideChart").textContent="⚠️ No upcoming tide predictions.";qs("tideStatus").style.background="yellow";return;}
-    const heights=future.map(r=>parseFloat(r[2]));
-    const maxH=Math.max(...heights),minH=Math.min(...heights);
-    const highRow=future[heights.indexOf(maxH)],lowRow=future[heights.indexOf(minH)];
-    const bars=future.map((r,i)=>{
-      const t=new Date(r[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
-      const h=parseFloat(r[2]);
-      const isHigh=(h===maxH),isLow=(h===minH);
-      const icon=isHigh?"🌊":isLow?"⬇️":"";
-      let trend="",bgColor=tideColor(h);
-      if(i<future.length-1){
-        const nextH=parseFloat(future[i+1][2]);
-        if(nextH>h){trend="⬆️";bgColor=`linear-gradient(to top, deepskyblue, ${tideColor(h)})`;}
-        else if(nextH<h){trend="⬇️";bgColor=`linear-gradient(to top, #555, ${tideColor(h)})`;}
-      }
-      return `<div class="bar" style="height:${h*40}px;background:${bgColor}">
-                <div style="font-size:1.4rem">${icon}</div>
-                <span>${t}<br>${h.toFixed(2)}m ${trend}</span>
-              </div>`;
+    const r=await fetch("https://www.met.ie/Open_Data/json/warning.json");
+    const j=await r.json();
+    const counties=["Clare","Galway","Limerick","Kerry","Mayo"];
+    const relevant=j.filter(w=>w.regions.some(r=>counties.includes(r)));
+    if(!relevant.length){box.innerHTML="<i>No warnings for Clare/nearby counties.</i>";return;}
+    box.innerHTML=relevant.map(w=>{
+      const colour=w.colour.toLowerCase();
+      return `<div class="warning ${colour}"><b>${w.colour} Warning:</b> ${w.headline} (${w.regions.join(", ")})<br>${w.description}</div>`;
     }).join("");
-    qs("tideChart").innerHTML=bars;
-    const highTime=new Date(highRow[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
-    const lowTime=new Date(lowRow[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
-    qs("nextTide").innerHTML=`<span class="high"><b>Next High Tide:</b> ${highTime} — ${maxH.toFixed(2)} m 🌊</span><br>
-                              <span class="low"><b>Next Low Tide:</b> ${lowTime} — ${minH.toFixed(2)} m ⬇️</span>`;
-    qs("tideSource").textContent=`Source: ${CUR.station}`;
-    qs("tideStatus").style.background="green";
-  }catch(e){qs("tideChart").textContent="⚠️ Tide fetch failed";qs("tideStatus").style.background="red";}
+  }catch(e){box.innerHTML="⚠️ Error loading warnings.";}
+}
+
+/* Tides (simplified for demo) */
+async function loadTide(){
+  qs("tideChart").textContent="⚠️ Tide data placeholder (proxy needed)";
+  qs("tideStatus").style.background="yellow";
 }
 
 /* Refresh */
@@ -210,7 +206,7 @@ function updateAll(){
   setCurrent(sel.value);
   const now=new Date();
   qs("latestData").textContent="Latest data as of: "+now.toLocaleTimeString("en-IE",{hour12:false});
-  loadWeather();loadTide();
+  loadWeather();loadWarnings();loadTide();
 }
 updateAll();setInterval(updateAll,60000);
 </script>
