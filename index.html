@@ -103,26 +103,26 @@
 function log(m){const d=document.getElementById('debug');d.textContent+=m+"\\n";d.scrollTop=d.scrollHeight;}
 function qs(id){return document.getElementById(id);}
 
-/* Locations: Clare, Galway, Aran Islands + inland */
+/* Locations with correct tide station IDs */
 const LOCS={
- "DOOLIN":       {name:"Doolin Port",        lat:53.016, lon:-9.4,   station:"Inishmore"},
- "BALLYVAUGHAN": {name:"Ballyvaughan",       lat:53.120, lon:-9.150, station:"Galway_Port"},
- "CARRAN":       {name:"Carran (Inland)",    lat:53.040, lon:-9.120, station:null},
- "EAGLES_ROCK":  {name:"Eagle’s Rock",       lat:53.030, lon:-9.300, station:null},
+ "DOOLIN":       {name:"Doolin Port", lat:53.016, lon:-9.4,   station:"Inishmore"},
+ "BALLYVAUGHAN": {name:"Ballyvaughan", lat:53.120, lon:-9.150, station:"Galway_Port"},
+ "CARRAN":       {name:"Carran (Inland)", lat:53.040, lon:-9.120, station:null},
+ "EAGLES_ROCK":  {name:"Eagle’s Rock", lat:53.030, lon:-9.300, station:null},
  "AILL_NA_SEARRACH": {name:"Aill na Searrach", lat:52.972, lon:-9.430, station:null},
  "CLIFFS_CENTER":{name:"Cliffs of Moher Visitor Centre", lat:52.971, lon:-9.430, station:null},
- "FANORE":       {name:"Fanore",             lat:53.14,  lon:-9.28,  station:"Inishmore"},
- "QUILTY":       {name:"Quilty",             lat:52.82,  lon:-9.45,  station:"Kilrush"},
- "KILKEE":       {name:"Kilkee",             lat:52.678, lon:-9.644, station:"Kilrush"},
- "LAHINCH":      {name:"Lahinch",            lat:52.933, lon:-9.35,  station:"Inishmore"},
- "SPANISH_PT":   {name:"Spanish Point",      lat:52.85,  lon:-9.42,  station:"Kilrush"},
- "WHITESTRAND":  {name:"Whitestrand",        lat:52.85,  lon:-9.42,  station:"Kilrush"},
- "KILRUSH":      {name:"Kilrush",            lat:52.64,  lon:-9.48,  station:"Kilrush"},
- "KINVARA":      {name:"Kinvara",            lat:53.14,  lon:-8.93,  station:"Galway_Port"},
- "GALWAY":       {name:"Galway",             lat:53.27,  lon:-9.05,  station:"Galway_Port"},
- "INIS_MOR":     {name:"Inis Mór",           lat:53.11,  lon:-9.65,  station:"Inishmore"},
- "INIS_MEAIN":   {name:"Inis Meáin",         lat:53.08,  lon:-9.57,  station:"Inishmaan"},
- "INIS_OIRR":    {name:"Inis Oírr",          lat:53.06,  lon:-9.51,  station:"Inisheer"}
+ "FANORE":       {name:"Fanore", lat:53.14, lon:-9.28,  station:"Inishmore"},
+ "QUILTY":       {name:"Quilty", lat:52.82, lon:-9.45,  station:"Kilrush"},
+ "KILKEE":       {name:"Kilkee", lat:52.678, lon:-9.644, station:"Kilrush"},
+ "LAHINCH":      {name:"Lahinch", lat:52.933, lon:-9.35, station:"Inishmore"},
+ "SPANISH_PT":   {name:"Spanish Point", lat:52.85, lon:-9.42, station:"Kilrush"},
+ "WHITESTRAND":  {name:"Whitestrand", lat:52.85, lon:-9.42, station:"Kilrush"},
+ "KILRUSH":      {name:"Kilrush", lat:52.64, lon:-9.48, station:"Kilrush"},
+ "KINVARA":      {name:"Kinvara", lat:53.14, lon:-8.93, station:"Galway_Port"},
+ "GALWAY":       {name:"Galway", lat:53.27, lon:-9.05, station:"Galway_Port"},
+ "INIS_MOR":     {name:"Inis Mór", lat:53.11, lon:-9.65, station:"Inishmore"},
+ "INIS_MEAIN":   {name:"Inis Meáin", lat:53.08, lon:-9.57, station:"Inishmaan"},
+ "INIS_OIRR":    {name:"Inis Oírr", lat:53.06, lon:-9.51, station:"Inisheer"}
 };
 const sel=qs("locationSelect");
 for(const k in LOCS){const o=document.createElement("option");o.value=k;o.textContent=LOCS[k].name;if(k==="DOOLIN")o.selected=true;sel.appendChild(o);}
@@ -133,7 +133,7 @@ function setCurrent(loc){
   CUR=LOCS[loc];
   qs("locName").textContent=CUR.name;
   qs("latlon").textContent="Lat: "+CUR.lat.toFixed(3)+", Lon: "+CUR.lon.toFixed(3);
-  qs("mapImg").src=`https://staticmap.openstreetmap.de/staticmap.php?center=${CUR.lat},${CUR.lon}&zoom=11&size=320x200&maptype=mapnik&markers=${CUR.lat},${CUR.lon},red-pushpin`;
+  qs("mapImg").src=`https://maps.wikimedia.org/img/osm-intl,11,${CUR.lat},${CUR.lon},320x200.png`;
 }
 
 /* Clock */
@@ -180,14 +180,21 @@ function loadTide(){
       const highRow=future[heights.indexOf(maxH)];
       const lowRow=future[heights.indexOf(minH)];
 
-      const bars=future.map(r=>{
+      const bars=future.map((r,i)=>{
         const t=new Date(r[1]).toLocaleTimeString("en-IE",{hour:'2-digit',minute:'2-digit',hour12:false});
         const h=parseFloat(r[2]);
         const isHigh=(h===maxH); const isLow=(h===minH);
         const icon=isHigh?"🌊":isLow?"⬇️":"";
-        return `<div class="bar" style="height:${h*40}px;background:${tideColor(h)}">
+        // Trend shading
+        let trend="", bgColor=tideColor(h);
+        if(i<future.length-1){
+          const nextH=parseFloat(future[i+1][2]);
+          if(nextH>h){ trend="⬆️"; bgColor=`linear-gradient(to top, deepskyblue, ${tideColor(h)})`; }
+          else if(nextH<h){ trend="⬇️"; bgColor=`linear-gradient(to top, #555, ${tideColor(h)})`; }
+        }
+        return `<div class="bar" style="height:${h*40}px;background:${bgColor}">
                   <div style="font-size:1.4rem">${icon}</div>
-                  <span>${t}<br>${h.toFixed(2)}m</span>
+                  <span>${t}<br>${h.toFixed(2)}m ${trend}</span>
                 </div>`;
       }).join("");
       qs("tideChart").innerHTML=bars;
